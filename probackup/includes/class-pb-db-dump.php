@@ -132,12 +132,15 @@ class PB_DB_Dump {
 	/**
 	 * Run a slice of the dump.
 	 *
-	 * @param array  $st   DB state (modified).
+	 * @param array  $job  Job (modified; uses $job['db']).
 	 * @param string $file SQL output file.
 	 * @return bool True when the whole dump is finished.
 	 */
-	public static function step( &$st, $file ) {
+	public static function step( &$job, $file ) {
 		global $wpdb;
+		$st        = &$job['db'];
+		$req_rows  = 0;
+		$req_table = '';
 		$fh = PB_Archive::open_append( $file, $st['sql_size'] );
 		if ( ! $fh ) {
 			throw new Exception( 'Cannot write the database dump file. Check free disk space and permissions.' );
@@ -155,9 +158,24 @@ class PB_DB_Dump {
 				$create = $wpdb->get_row( 'SHOW CREATE TABLE ' . PB_Util::ident( $tb['name'] ), ARRAY_N ); // phpcs:ignore
 				if ( ! $create || empty( $create[1] ) ) {
 					// Table disappeared while exporting; skip it.
+					PB_Log::add( $job, sprintf( 'Table %s disappeared during export — skipped', $tb['name'] ), 'warn' );
 					$st['ti']++;
 					continue;
 				}
+				$st['t_rows']  = 0;
+				$st['t_bytes'] = 0;
+				PB_Log::add(
+					$job,
+					sprintf(
+						'[%d/%d] %s — structure saved, ~%s rows%s%s',
+						$st['ti'] + 1,
+						count( $st['tables'] ),
+						$tb['name'],
+						PB_Log::num( $tb['rows'] ),
+						$tb['keyset'] ? ' (fast primary-key paging)' : ( $tb['pk'] ? ' (key paging)' : ' (no primary key, offset paging)' ),
+						$tb['where'] ? ' · filtered' : ''
+					)
+				);
 				$sql = $create[1];
 				$sql = preg_replace( '/^CREATE TABLE `' . preg_quote( $tb['name'], '/' ) . '`/', 'CREATE TABLE ' . $token, $sql );
 				$sql = str_replace( 'REFERENCES `' . $wpdb->prefix, 'REFERENCES `' . self::PREFIX_TOKEN, $sql );
@@ -171,8 +189,10 @@ class PB_DB_Dump {
 
 			$rows = self::fetch( $tb, $st );
 			if ( empty( $rows ) ) {
+				self::table_done( $job, $tb );
 				$st['ti']++;
 				$st['stage'] = 'schema';
+				$req_rows    = 0;
 				continue;
 			}
 
@@ -215,20 +235,42 @@ class PB_DB_Dump {
 			$count             = count( $rows );
 			$st['offset']     += $count;
 			$st['rows_done']  += $count;
+			$st['t_rows']      = ( isset( $st['t_rows'] ) ? $st['t_rows'] : 0 ) + $count;
+			$st['t_bytes']     = ( isset( $st['t_bytes'] ) ? $st['t_bytes'] : 0 ) + $bytes;
+			$req_rows         += $count;
+			$req_table         = $tb['name'];
 			// Adapt batch size: aim for ~2 MB of row data per query.
 			$avg         = $bytes / max( 1, $count );
 			$st['batch'] = (int) max( 20, min( 5000, 2097152 / max( 1, $avg ) ) );
 			unset( $rows, $buf );
 			if ( $count < self::batch_limit( $st ) && $tb['keyset'] ) {
 				// Fewer rows than requested => table finished (saves one query).
+				self::table_done( $job, $tb );
 				$st['ti']++;
 				$st['stage'] = 'schema';
+				$req_rows    = 0;
 			}
+		}
+		if ( $req_rows > 0 && 'rows' === $st['stage'] && isset( $st['tables'][ $st['ti'] ] ) ) {
+			$tb = $st['tables'][ $st['ti'] ];
+			PB_Log::add( $job, sprintf( '%s — %s / ~%s rows exported (batch size %s)', $req_table, PB_Log::num( $st['t_rows'] ), PB_Log::num( max( $tb['rows'], $st['t_rows'] ) ), PB_Log::num( $st['batch'] ) ) );
 		}
 		fflush( $fh );
 		$st['sql_size'] = ftell( $fh );
 		fclose( $fh ); // phpcs:ignore
 		return $done;
+	}
+
+	/**
+	 * Log a finished table.
+	 *
+	 * @param array $job Job.
+	 * @param array $tb  Table info.
+	 */
+	private static function table_done( &$job, $tb ) {
+		$rows  = isset( $job['db']['t_rows'] ) ? $job['db']['t_rows'] : 0;
+		$bytes = isset( $job['db']['t_bytes'] ) ? $job['db']['t_bytes'] : 0;
+		PB_Log::add( $job, sprintf( '%s — done: %s rows (%s)', $tb['name'], PB_Log::num( $rows ), PB_Log::size( $bytes ) ), 'ok' );
 	}
 
 	/**

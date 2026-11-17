@@ -65,10 +65,13 @@ class PB_DB_Import {
 		self::session( $caps );
 		// Autocommit stays ON: every statement is durable the moment the cursor
 		// moves past it, so a dropped connection can never lose committed rows.
-		$result = 'more';
+		$result          = 'more';
+		$st['req_rows']  = 0;
+		$st['req_stmts'] = 0;
 		while ( true ) {
 			if ( $st['pos'] >= $st['end'] ) {
 				$result = 'done';
+				self::table_finished( $job );
 				break;
 			}
 			if ( PB_Util::out_of_time() ) {
@@ -84,10 +87,13 @@ class PB_DB_Import {
 				$st['pos']   = $next;
 				$st['index']++;
 				$job['skipped'][] = $st['index'];
+				PB_Log::add( $job, sprintf( 'Skipped statement #%d at your request', $st['index'] ), 'warn' );
 				continue;
 			}
+			self::track( $sql, $job );
 			$err = self::execute( $sql, $job );
 			if ( true !== $err ) {
+				PB_Log::add( $job, sprintf( 'Statement #%d failed: %s', $st['index'] + 1, $err ), 'err' );
 				$job['error'] = array(
 					'stage'     => 'db',
 					'statement' => $st['index'] + 1,
@@ -99,8 +105,52 @@ class PB_DB_Import {
 			}
 			$st['pos'] = $next;
 			$st['index']++;
+			$st['req_stmts']++;
+			if ( 0 === strncasecmp( ltrim( $sql ), 'INSERT', 6 ) ) {
+				$rows             = substr_count( $sql, "),\n(" ) + 1;
+				$st['cur_rows']   = ( isset( $st['cur_rows'] ) ? $st['cur_rows'] : 0 ) + $rows;
+				$st['cur_bytes']  = ( isset( $st['cur_bytes'] ) ? $st['cur_bytes'] : 0 ) + strlen( $sql );
+				$st['req_rows']  += $rows;
+			}
+		}
+		if ( 'more' === $result && $st['req_rows'] > 0 && ! empty( $st['cur'] ) ) {
+			PB_Log::add( $job, sprintf( '%s — %s rows imported so far · statement %s of %s', $st['cur'], PB_Log::num( $st['cur_rows'] ), PB_Log::num( $st['index'] ), PB_Log::num( $st['total'] ) ) );
 		}
 		return $result;
+	}
+
+	/**
+	 * Notice table changes from the statement head and log per-table results.
+	 *
+	 * @param string $sql SQL.
+	 * @param array  $job Job.
+	 */
+	private static function track( $sql, &$job ) {
+		if ( ! preg_match( '/^\s*CREATE TABLE `' . preg_quote( PB_DB_Dump::PREFIX_TOKEN, '/' ) . '([^`]+)`/', $sql, $m ) ) {
+			return;
+		}
+		self::table_finished( $job );
+		$st                = &$job['db'];
+		$st['cur']         = $m[1];
+		$st['cur_rows']    = 0;
+		$st['cur_bytes']   = 0;
+		$st['tables_done'] = ( isset( $st['tables_done'] ) ? $st['tables_done'] : 0 ) + 1;
+		$total             = isset( $job['manifest']['tables'] ) ? count( $job['manifest']['tables'] ) : 0;
+		PB_Log::add( $job, sprintf( '[%d/%d] Creating table %s', $st['tables_done'], $total, $job['live'] . $m[1] ) );
+	}
+
+	/**
+	 * Log the table that just completed.
+	 *
+	 * @param array $job Job.
+	 */
+	private static function table_finished( &$job ) {
+		$st = &$job['db'];
+		if ( empty( $st['cur'] ) ) {
+			return;
+		}
+		PB_Log::add( $job, sprintf( '%s — done: %s rows (%s of SQL)', $job['live'] . $st['cur'], PB_Log::num( isset( $st['cur_rows'] ) ? $st['cur_rows'] : 0 ), PB_Log::size( isset( $st['cur_bytes'] ) ? $st['cur_bytes'] : 0 ) ), 'ok' );
+		$st['cur'] = '';
 	}
 
 	/**
@@ -157,7 +207,18 @@ class PB_DB_Import {
 			$sql = str_replace( PB_DB_Dump::PREFIX_TOKEN, $tmp, $sql );
 		}
 		if ( 'CREATE' === $type ) {
-			$sql = self::fix_create( $sql, $job['caps'] );
+			$notes = array();
+			$sql   = self::fix_create( $sql, $job['caps'], $notes );
+			foreach ( $notes as $note ) {
+				// Log each kind of fix once in full; afterwards just mention the table.
+				$kind = substr( $note, strpos( $note, ': ' ) + 2 );
+				if ( empty( $job['db']['seen'][ md5( $kind ) ] ) ) {
+					$job['db']['seen'][ md5( $kind ) ] = 1;
+					PB_Log::add( $job, 'Compatibility fix: ' . $note, 'warn' );
+				} else {
+					PB_Log::add( $job, 'Compatibility fix applied to ' . strtok( $note, ':' ) . ' (same as above)', 'warn' );
+				}
+			}
 		}
 
 		// Too big for this server's max_allowed_packet? Split the multi-row INSERT.
@@ -166,6 +227,7 @@ class PB_DB_Import {
 			if ( count( $parts ) < 2 ) {
 				return self::too_big( $sql, $job );
 			}
+			PB_Log::add( $job, sprintf( 'INSERT of %s is larger than this server\'s max_allowed_packet (%s) — split into %d smaller queries', PB_Log::size( strlen( $sql ) ), PB_Log::size( $job['caps']['packet'] ), count( $parts ) ), 'warn' );
 			foreach ( $parts as $part ) {
 				$r = self::run( $part, $job, 'INSERT' );
 				if ( true !== $r ) {
@@ -200,6 +262,7 @@ class PB_DB_Import {
 				}
 				self::session( $job['caps'] );
 				$job['budget'] = max( 3, (int) ( $job['budget'] * 0.7 ) );
+				PB_Log::add( $job, sprintf( 'Database connection lost (%s) — reconnected and retrying; step time reduced to %ss', $error, $job['budget'] ), 'warn' );
 				if ( 'INSERT' === $type && strlen( $sql ) > 65536 ) {
 					$parts = self::split_insert( $sql, (int) max( 16384, strlen( $sql ) / 4 ) );
 					if ( count( $parts ) > 1 ) {
@@ -216,6 +279,7 @@ class PB_DB_Import {
 			}
 			if ( 'INSERT' === $type && ( 1062 === $errno || false !== strpos( $lower, 'duplicate entry' ) ) && 0 !== stripos( $sql, 'INSERT IGNORE' ) ) {
 				$sql = preg_replace( '/^INSERT INTO/i', 'INSERT IGNORE INTO', ltrim( $sql ) );
+				PB_Log::add( $job, 'Duplicate key (' . $error . ') — rows already present, continuing with INSERT IGNORE', 'warn' );
 				continue;
 			}
 			if ( 'INSERT' === $type && ( 1153 === $errno || false !== strpos( $lower, 'max_allowed_packet' ) ) && strlen( $sql ) > 16384 ) {
@@ -223,6 +287,7 @@ class PB_DB_Import {
 				if ( count( $parts ) < 2 ) {
 					return self::too_big( $sql, $job );
 				}
+				PB_Log::add( $job, sprintf( 'Server rejected a %s query (max_allowed_packet) — retrying as %d smaller queries', PB_Log::size( strlen( $sql ) ), count( $parts ) ), 'warn' );
 				foreach ( $parts as $part ) {
 					$r = self::run( $part, $job, 'INSERT' );
 					if ( true !== $r ) {
@@ -233,22 +298,29 @@ class PB_DB_Import {
 			}
 			if ( 'CREATE' === $type ) {
 				$fixed = $sql;
+				$why   = '';
 				if ( ( 1050 === $errno || false !== strpos( $lower, 'already exists' ) ) && preg_match( '/^CREATE TABLE\s+(`[^`]+`)/i', ltrim( $sql ), $tm ) ) {
 					// A previous request was killed after CREATE but before saving progress.
 					PB_Util::raw_query( 'DROP TABLE IF EXISTS ' . $tm[1] );
+					PB_Log::add( $job, 'Table ' . $tm[1] . ' existed from an interrupted step — recreated it', 'warn' );
 					continue;
 				}
 				if ( 1273 === $errno || false !== strpos( $lower, 'unknown collation' ) || false !== strpos( $lower, 'unknown character set' ) ) {
 					$fixed = self::downgrade_charset( $sql, true );
+					$why   = 'unknown collation/charset → using a compatible one';
 				} elseif ( 1071 === $errno || false !== strpos( $lower, 'key was too long' ) ) {
 					$fixed = self::downgrade_charset( $sql, false );
+					$why   = 'index too long for this server → using utf8 for this table';
 				} elseif ( 1286 === $errno || false !== strpos( $lower, 'unknown storage engine' ) ) {
 					$fixed = preg_replace( '/ENGINE\s*=\s*\w+/i', 'ENGINE=InnoDB', $sql );
+					$why   = 'storage engine not available → InnoDB';
 				} elseif ( 1067 === $errno || false !== strpos( $lower, 'invalid default value' ) ) {
 					$fixed = preg_replace( "/DEFAULT '0000-00-00( 00:00:00)?'/i", 'DEFAULT NULL', $sql );
 					$fixed = preg_replace( '/NOT NULL DEFAULT NULL/i', 'NULL DEFAULT NULL', $fixed );
+					$why   = 'zero-date defaults not allowed → DEFAULT NULL';
 				}
 				if ( $fixed !== $sql ) {
+					PB_Log::add( $job, sprintf( 'Server said "%s" — %s, retrying', $error, $why ), 'warn' );
 					$sql = $fixed;
 					continue;
 				}
@@ -262,31 +334,42 @@ class PB_DB_Import {
 	 * Proactive CREATE TABLE compatibility rewrites.
 	 *
 	 * @param string $sql  SQL.
-	 * @param array  $caps Caps.
+	 * @param array  $caps  Caps.
+	 * @param array  $notes Human-readable notes about what was changed (out).
 	 * @return string
 	 */
-	private static function fix_create( $sql, $caps ) {
+	private static function fix_create( $sql, $caps, &$notes = array() ) {
+		$table = preg_match( '/^\s*CREATE TABLE `pbt[a-z0-9]{4}_([^`]+)`/', $sql, $tm ) ? $tm[1] : 'table';
 		// MariaDB-only table options.
-		$sql = preg_replace( '/\s(PAGE_CHECKSUM|TRANSACTIONAL)=\d/i', '', $sql );
+		$before = $sql;
+		$sql    = preg_replace( '/\s(PAGE_CHECKSUM|TRANSACTIONAL)=\d/i', '', $sql );
+		if ( $sql !== $before ) {
+			$notes[] = "$table: removed MariaDB-only table options";
+		}
 		$sql = preg_replace( '/\/\*!\d+\s*DEFINER=[^*]*\*\//i', '', $sql );
 		$sql = preg_replace( '/DEFINER\s*=\s*`[^`]*`@`[^`]*`/i', '', $sql );
 		// MySQL 8 writes "utf8mb3"; older servers only know the alias "utf8".
-		if ( ! in_array( 'utf8mb3_general_ci', $caps['collations'], true ) ) {
-			$sql = preg_replace( '/utf8mb3/i', 'utf8', $sql );
+		if ( ! in_array( 'utf8mb3_general_ci', $caps['collations'], true ) && false !== stripos( $sql, 'utf8mb3' ) ) {
+			$sql     = preg_replace( '/utf8mb3/i', 'utf8', $sql );
+			$notes[] = "$table: utf8mb3 → utf8 (older server naming)";
 		}
 		// Unknown collations (e.g. MySQL 8 utf8mb4_0900_ai_ci on MariaDB / MySQL 5.7).
 		if ( preg_match_all( '/(?:COLLATE[= ]+)(\w+)/i', $sql, $m ) ) {
 			foreach ( array_unique( $m[1] ) as $coll ) {
 				if ( ! in_array( $coll, $caps['collations'], true ) && preg_match( '/^utf8/i', $coll ) ) {
-					$sql = str_replace( $coll, self::best_collation( $coll, $caps ), $sql );
+					$best    = self::best_collation( $coll, $caps );
+					$sql     = str_replace( $coll, $best, $sql );
+					$notes[] = "$table: collation $coll is not available here → $best";
 				}
 			}
 		}
-		if ( ! $caps['utf8mb4'] ) {
-			$sql = self::downgrade_charset( $sql, false );
+		if ( ! $caps['utf8mb4'] && false !== stripos( $sql, 'utf8mb4' ) ) {
+			$sql     = self::downgrade_charset( $sql, false );
+			$notes[] = "$table: this server has no utf8mb4 → utf8 (emoji may be lost)";
 		}
 		if ( ! empty( $caps['engines'] ) && preg_match( '/ENGINE\s*=\s*(\w+)/i', $sql, $e ) && ! in_array( strtoupper( $e[1] ), $caps['engines'], true ) ) {
-			$sql = preg_replace( '/ENGINE\s*=\s*\w+/i', 'ENGINE=InnoDB', $sql );
+			$sql     = preg_replace( '/ENGINE\s*=\s*\w+/i', 'ENGINE=InnoDB', $sql );
+			$notes[] = "$table: storage engine {$e[1]} not available → InnoDB";
 		}
 		return $sql;
 	}

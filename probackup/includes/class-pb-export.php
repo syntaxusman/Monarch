@@ -85,10 +85,32 @@ class PB_Export {
 				'bytes'  => 0,
 			),
 		);
-		self::log( $job, __( 'Export started.', 'probackup' ) );
+		global $wpdb, $wp_version;
+		self::log( $job, sprintf( 'Export started for %s', home_url() ), 'step' );
+		self::log( $job, sprintf( 'Environment: WordPress %s · PHP %s · %s %s · table prefix "%s"', $wp_version, PHP_VERSION, false !== stripos( (string) $wpdb->db_server_info(), 'maria' ) ? 'MariaDB' : 'MySQL', $wpdb->db_version(), $wpdb->prefix ) );
+		$inc = array();
+		foreach ( array( 'database' => 'database', 'uploads' => 'uploads', 'plugins' => 'plugins', 'themes' => 'themes', 'muplugins' => 'must-use plugins', 'other' => 'other wp-content folders' ) as $k => $label ) {
+			if ( $o[ $k ] ) {
+				$inc[] = $label;
+			}
+		}
+		self::log( $job, 'Including: ' . implode( ', ', $inc ) );
+		$skip = array();
+		foreach ( array( 'no_spam' => 'spam/trashed comments', 'no_revisions' => 'post revisions', 'no_transients' => 'transients' ) as $k => $label ) {
+			if ( $o[ $k ] && $o['database'] ) {
+				$skip[] = $label;
+			}
+		}
+		if ( $skip ) {
+			self::log( $job, 'Skipping: ' . implode( ', ', $skip ) );
+		}
+		self::log( $job, 'Time budget per step: ' . (float) PB_Storage::settings()['time_budget'] . 's · memory limit ' . ini_get( 'memory_limit' ) );
 		if ( $o['database'] ) {
-			/* translators: %d: table count */
-			self::log( $job, sprintf( __( 'Found %d database tables.', 'probackup' ), count( $job['db']['tables'] ) ) );
+			$rows = 0;
+			foreach ( $job['db']['tables'] as $t ) {
+				$rows += $t['rows'];
+			}
+			self::log( $job, sprintf( 'Found %d tables (~%s rows) to export', count( $job['db']['tables'] ), PB_Log::num( $rows ) ), 'step' );
 		}
 		PB_Storage::save_job( $job );
 		return $job;
@@ -100,11 +122,8 @@ class PB_Export {
 	 * @param array  $job Job.
 	 * @param string $msg Message.
 	 */
-	public static function log( &$job, $msg ) {
-		$job['log'][] = gmdate( 'H:i:s' ) . '  ' . $msg;
-		if ( count( $job['log'] ) > 60 ) {
-			$job['log'] = array_slice( $job['log'], -60 );
-		}
+	public static function log( &$job, $msg, $level = 'info' ) {
+		PB_Log::add( $job, $msg, $level );
 	}
 
 	/**
@@ -117,25 +136,27 @@ class PB_Export {
 		$dir = PB_Storage::job_dir( $job['id'] );
 		switch ( $job['stage'] ) {
 			case 'db':
-				if ( PB_DB_Dump::step( $job['db'], $dir . '/database.sql' ) ) {
-					/* translators: 1: rows, 2: statements */
-					self::log( $job, sprintf( __( 'Database exported: %1$s rows in %2$s statements.', 'probackup' ), number_format_i18n( $job['db']['rows_done'] ), number_format_i18n( $job['db']['stmts'] ) ) );
+				if ( PB_DB_Dump::step( $job, $dir . '/database.sql' ) ) {
+					self::log( $job, sprintf( 'Database exported: %s rows in %s SQL statements (%s)', PB_Log::num( $job['db']['rows_done'] ), PB_Log::num( $job['db']['stmts'] ), PB_Log::size( $job['db']['sql_size'] ) ), 'ok' );
 					$job['stage'] = 'scan';
+					self::log( $job, 'Scanning wp-content for files…', 'step' );
 				}
 				break;
 			case 'scan':
+				$before = $job['scan']['files'];
 				if ( self::scan( $job, $dir . '/files.txt' ) ) {
-					/* translators: 1: file count, 2: size */
-					self::log( $job, sprintf( __( 'Found %1$s files (%2$s).', 'probackup' ), number_format_i18n( $job['scan']['files'] ), size_format( $job['scan']['bytes'], 1 ) ) );
+					self::log( $job, sprintf( 'File scan complete: %s files, %s', PB_Log::num( $job['scan']['files'] ), PB_Log::size( $job['scan']['bytes'] ) ), 'ok' );
 					$job['stage'] = 'archive';
+					self::log( $job, 'Building the .pbk package…', 'step' );
+				} elseif ( $job['scan']['files'] > $before ) {
+					self::log( $job, sprintf( 'Scanning… %s files so far (%s), %d folders queued', PB_Log::num( $job['scan']['files'] ), PB_Log::size( $job['scan']['bytes'] ), count( $job['scan']['stack'] ) ) );
 				}
 				break;
 			case 'archive':
 				if ( self::archive( $job, $dir ) ) {
 					$job['stage'] = 'done';
 					rename( $dir . '/' . $job['name'] . '.part', PB_Storage::dir( 'backups' ) . '/' . $job['name'] ); // phpcs:ignore
-					/* translators: %s: size */
-					self::log( $job, sprintf( __( 'Archive ready (%s).', 'probackup' ), size_format( $job['arc']['size'], 1 ) ) );
+					self::log( $job, sprintf( 'Package ready: %s (%s) in %s', $job['name'], PB_Log::size( $job['arc']['size'] ), human_time_diff( $job['started'], time() ) ), 'ok' );
 					PB_Storage::prune();
 				}
 				break;
@@ -185,7 +206,14 @@ class PB_Export {
 			'stage'   => $job['stage'],
 			'percent' => round( $pct, 1 ),
 			'label'   => $label,
-			'log'     => $job['log'],
+			'log'     => PB_Log::since( $job ),
+			'seq'     => isset( $job['log_seq'] ) ? $job['log_seq'] : 0,
+			'stats'   => array(
+				'tables'      => $job['db'] ? min( $job['db']['ti'], count( $job['db']['tables'] ) ) . ' / ' . count( $job['db']['tables'] ) : '—',
+				'rows'        => $job['db'] ? PB_Log::num( $job['db']['rows_done'] ) : '—',
+				'files'       => PB_Log::num( $job['arc']['files'] ) . ' / ' . PB_Log::num( $job['scan']['files'] ),
+				'package'     => PB_Log::size( $job['arc']['size'] ),
+			),
 			'done'    => 'done' === $job['stage'],
 			'file'    => 'done' === $job['stage'] ? $job['name'] : '',
 			'size'    => 'done' === $job['stage'] ? size_format( $job['arc']['size'], 1 ) : '',
@@ -353,8 +381,12 @@ class PB_Export {
 			$a['size']  = ftell( $fh );
 			fclose( $fh ); // phpcs:ignore
 			$a['stage'] = $job['db'] ? 'sql' : 'files';
+			self::log( $job, 'Wrote package manifest (package.json)' );
 			return false;
 		}
+		$files_before = $a['files'];
+		$bytes_before = $a['bytes'];
+		$last_rel     = '';
 		$fh = PB_Archive::open_append( $file, $a['size'] );
 		if ( ! $fh ) {
 			throw new Exception( 'Cannot write the archive. Check free disk space.' );
@@ -367,9 +399,11 @@ class PB_Export {
 				$a['cursor'] = null;
 				$a['stage']  = 'files';
 				@unlink( $dir . '/database.sql' ); // phpcs:ignore
+				self::log( $job, sprintf( 'Database added to package (%s)', PB_Log::size( $job['db']['sql_size'] ) ), 'ok' );
 			} else {
 				$a['bytes'] += $r['done'] - $before;
 				$a['cursor'] = $r;
+				self::log( $job, sprintf( 'Adding database to package… %s of %s', PB_Log::size( $r['done'] ), PB_Log::size( $r['size'] ) ) );
 			}
 		}
 		if ( 'files' === $a['stage'] ) {
@@ -393,15 +427,21 @@ class PB_Export {
 					$rel    = substr( $line, $tab + 1 );
 					$before = $a['cursor'] ? $a['cursor']['done'] : 0;
 					$r      = PB_Archive::add_file_piece( $fh, $root . '/' . $rel, 'content/' . $rel, $a['cursor'] );
+					$last_rel = $rel;
 					if ( true === $r ) {
-						$a['bytes'] += max( 0, (int) substr( $line, 0, $tab ) - $before );
-						$a['cursor'] = null;
+						$fsize        = (int) substr( $line, 0, $tab );
+						$a['bytes']  += max( 0, $fsize - $before );
+						$a['cursor']  = null;
 						$a['files']++;
 						$a['pos'] = ftell( $list );
+						if ( $fsize >= 20971520 ) {
+							self::log( $job, sprintf( 'Packed large file %s (%s)', $rel, PB_Log::size( $fsize ) ) );
+						}
 					} else {
 						$a['bytes'] += $r['done'] - $before;
 						$a['cursor'] = $r;
 						$a['pos']    = $line_start;
+						self::log( $job, sprintf( 'Packing large file %s… %d%% (%s of %s)', $rel, floor( $r['done'] / max( 1, $r['size'] ) * 100 ), PB_Log::size( $r['done'] ), PB_Log::size( $r['size'] ) ) );
 						break;
 					}
 				}
@@ -410,8 +450,12 @@ class PB_Export {
 				$a['stage'] = 'end';
 			}
 		}
+		if ( $a['files'] > $files_before ) {
+			self::log( $job, sprintf( 'Packed %s files (%s) · %s / %s total · last: %s', PB_Log::num( $a['files'] - $files_before ), PB_Log::size( $a['bytes'] - $bytes_before ), PB_Log::num( $a['files'] ), PB_Log::num( $job['scan']['files'] ), $last_rel ) );
+		}
 		if ( 'end' === $a['stage'] ) {
 			PB_Archive::finish( $fh );
+			self::log( $job, 'All files packed, archive sealed', 'ok' );
 		}
 		fflush( $fh );
 		$a['size'] = ftell( $fh );

@@ -152,7 +152,28 @@ class PB_Plugin {
 				'resume'    => $resume,
 				'version'   => PROBACKUP_VERSION,
 				'diskFree'  => function_exists( 'disk_free_space' ) ? size_format( (float) @disk_free_space( WP_CONTENT_DIR ), 1 ) : '', // phpcs:ignore
+				'env'       => $this->env(),
 			)
+		);
+	}
+
+	/**
+	 * Server facts for the overview panel.
+	 *
+	 * @return array
+	 */
+	private function env() {
+		global $wpdb, $wp_version;
+		$server = (string) $wpdb->db_server_info();
+		return array(
+			array( 'WordPress', $wp_version ),
+			array( 'PHP', PHP_VERSION ),
+			array( 'Database', ( false !== stripos( $server, 'maria' ) ? 'MariaDB ' : 'MySQL ' ) . $wpdb->db_version() ),
+			array( 'Table prefix', $wpdb->prefix ),
+			array( 'Memory limit', ini_get( 'memory_limit' ) ),
+			array( 'Max upload', size_format( wp_max_upload_size() ) ),
+			array( 'Free disk', function_exists( 'disk_free_space' ) ? size_format( (float) @disk_free_space( WP_CONTENT_DIR ), 1 ) : 'unknown' ), // phpcs:ignore
+			array( 'Run programs (croc)', PB_Croc::can_exec() ? 'allowed' : 'disabled by host' ),
 		);
 	}
 
@@ -185,6 +206,7 @@ class PB_Plugin {
 			wp_send_json_error( array( 'message' => 'Unknown action.' ), 400 );
 		}
 		PB_Storage::ensure();
+		PB_Log::$since = isset( $_POST['since'] ) ? max( 0, (int) $_POST['since'] ) : 0; // phpcs:ignore
 		try {
 			$method = 'do_' . $sub;
 			$result = $this->$method();

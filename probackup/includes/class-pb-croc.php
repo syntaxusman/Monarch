@@ -493,10 +493,35 @@ class PB_Croc {
 			'state'   => $state,
 			'percent' => min( 100, $pct ),
 			'message' => wp_strip_all_tags( $last ),
+			'lines'   => self::clean_lines( $lines ),
 			'code'    => isset( $s['code'] ) ? $s['code'] : '',
 			'file'    => $file ? $file : ( isset( $s['file'] ) ? $s['file'] : '' ),
 			'elapsed' => time() - (int) $s['started'],
 		);
+	}
+
+	/**
+	 * croc output for the live log: messages plus only the latest progress-bar line.
+	 *
+	 * @param array $lines Raw lines.
+	 * @return array
+	 */
+	private static function clean_lines( $lines ) {
+		$out  = array();
+		$last = '';
+		foreach ( $lines as $l ) {
+			if ( preg_match( '/\d{1,3}%\s*\|/', $l ) ) {
+				$last = $l;
+				continue;
+			}
+			if ( ! in_array( $l, $out, true ) ) {
+				$out[] = $l;
+			}
+		}
+		if ( '' !== $last ) {
+			$out[] = $last;
+		}
+		return array_map( 'wp_strip_all_tags', array_slice( $out, -14 ) );
 	}
 
 	/**
