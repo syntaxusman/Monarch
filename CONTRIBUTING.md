@@ -4,7 +4,7 @@ Thanks for helping improve Monarch. This guide explains how to report problems, 
 
 ## Reporting bugs
 
-Open an [issue](https://github.com/zubbicodes/ProBackup/issues) and include:
+Open an [issue](https://github.com/zubbicodes/Monarch/issues) and include:
 
 - What you did, what you expected, and what happened instead.
 - **The activity log.** In Monarch, use the log's *Download* button and attach the `.txt` file. It already contains server versions, table names, row counts and any errors.
@@ -15,7 +15,7 @@ Remove anything private (domains, emails, keys) before you post. **Never attach 
 
 ### Security issues
 
-Don't open a public issue for a vulnerability. Report it privately through [GitHub Security Advisories](https://github.com/zubbicodes/ProBackup/security/advisories/new). We'll confirm receipt and work on a fix before disclosure.
+Don't open a public issue for a vulnerability. Report it privately through [GitHub Security Advisories](https://github.com/zubbicodes/Monarch/security/advisories/new). We'll confirm receipt and work on a fix before disclosure.
 
 ## Suggesting features
 
@@ -35,7 +35,7 @@ You don't need PHP installed locally; the tests run PHP inside Docker.
 ### Getting started
 
 ```bash
-git clone https://github.com/zubbicodes/ProBackup.git
+git clone https://github.com/zubbicodes/Monarch.git
 cd Monarch
 cd test && docker compose up -d
 ```

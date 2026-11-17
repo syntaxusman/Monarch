@@ -6,13 +6,13 @@
 
 **Move a complete WordPress site to another server, including large databases that other migration plugins fail to import.**
 
-[![Latest release](https://img.shields.io/github/v/release/zubbicodes/ProBackup?label=release)](https://github.com/zubbicodes/ProBackup/releases/latest)
-[![Release workflow](https://github.com/zubbicodes/ProBackup/actions/workflows/release.yml/badge.svg)](https://github.com/zubbicodes/ProBackup/actions/workflows/release.yml)
+[![Latest release](https://img.shields.io/github/v/release/zubbicodes/Monarch?label=release)](https://github.com/zubbicodes/Monarch/releases/latest)
+[![Release workflow](https://github.com/zubbicodes/Monarch/actions/workflows/release.yml/badge.svg)](https://github.com/zubbicodes/Monarch/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![WordPress 5.6+](https://img.shields.io/badge/WordPress-5.6%2B-21759b)
 ![PHP 7.4+](https://img.shields.io/badge/PHP-7.4%2B-777bb4)
 
-[Download](https://github.com/zubbicodes/ProBackup/releases/latest) · [How it works](#how-it-works) · [FAQ](#faq) · [Contributing](CONTRIBUTING.md)
+[Download](https://github.com/zubbicodes/Monarch/releases/latest) · [How it works](#how-it-works) · [FAQ](#faq) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -118,7 +118,7 @@ Monarch must be installed on **both** the source and the destination site.
 
 ## Installation
 
-1. Download **`monarch-migration.zip`** from the [latest release](https://github.com/zubbicodes/ProBackup/releases/latest).
+1. Download **`monarch-migration.zip`** from the [latest release](https://github.com/zubbicodes/Monarch/releases/latest).
    > Use the `monarch-migration.zip` attachment, not GitHub's "Source code" archive, which also contains the test suite.
 2. In WordPress, go to **Plugins → Add New → Upload Plugin**, choose the zip and click **Install Now**.
 3. Click **Activate**. **Monarch** appears in the admin menu.
@@ -328,7 +328,7 @@ No. Upload and download work on every host. croc is the faster and more convenie
 | Requests stop or time out | Lower **Time per step** in Settings, for example to 5 s. |
 | A single row is larger than the destination's `max_allowed_packet` | Ask your host to raise `max_allowed_packet`, then click **Retry**, or **Skip** that statement. |
 | The site shows 404 errors after the import | Go to **Settings → Permalinks** and click **Save**. |
-| Something else | Download the activity log and [open an issue](https://github.com/zubbicodes/ProBackup/issues). |
+| Something else | Download the activity log and [open an issue](https://github.com/zubbicodes/Monarch/issues). |
 
 ## Development
 
@@ -381,7 +381,7 @@ Releases are automatic. When a push to `main` changes the plugin version, the [R
 - builds `monarch-migration.zip`;
 - publishes a GitHub release, using the matching changelog entry from `monarch-migration/readme.txt` as the release notes.
 
-See [all releases](https://github.com/zubbicodes/ProBackup/releases).
+See [all releases](https://github.com/zubbicodes/Monarch/releases).
 
 ## Contributing
 
