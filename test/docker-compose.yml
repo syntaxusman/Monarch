@@ -1,0 +1,47 @@
+# End-to-end test: MySQL 8 source site -> MariaDB destination site with a different table prefix.
+services:
+  dbsrc:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wp
+      MYSQL_USER: wp
+      MYSQL_PASSWORD: wp
+  dbdst:
+    image: mariadb:10.4
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: wp
+      MARIADB_USER: wp
+      MARIADB_PASSWORD: wp
+    command: --max-allowed-packet=262144
+  src:
+    image: wordpress:php7.4-apache
+    ports: ["8081:80"]
+    environment:
+      WORDPRESS_DB_HOST: dbsrc
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wp
+      WORDPRESS_TABLE_PREFIX: src_
+    volumes:
+      - ../probackup:/var/www/html/wp-content/plugins/probackup
+      - ./runner.php:/var/www/html/runner.php
+    depends_on: [dbsrc]
+  dst:
+    image: wordpress:php8.3-apache
+    ports: ["8082:80"]
+    environment:
+      WORDPRESS_DB_HOST: dbdst
+      WORDPRESS_DB_USER: wp
+      WORDPRESS_DB_PASSWORD: wp
+      WORDPRESS_DB_NAME: wp
+      WORDPRESS_TABLE_PREFIX: dst_
+    volumes:
+      - ../probackup:/var/www/html/wp-content/plugins/probackup
+      - ./runner.php:/var/www/html/runner.php
+    depends_on: [dbdst]
+  cli:
+    image: wordpress:cli-php8.3
+    user: "33:33"
+    profiles: ["tools"]
