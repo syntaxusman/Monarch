@@ -1,0 +1,81 @@
+name: Release
+
+# A release is created automatically whenever a push to main changes the plugin
+# version (the "Version:" header in probackup/probackup.php) to one that has no
+# tag yet. Pushes that do not bump the version only run the checks.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'probackup/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read plugin version
+        id: ver
+        run: |
+          header=$(grep -m1 -E '^\s*\*\s*Version:' probackup/probackup.php | sed -E 's/.*Version:\s*//; s/\s+$//')
+          const=$(grep -m1 "PROBACKUP_VERSION'" probackup/probackup.php | sed -E "s/.*'PROBACKUP_VERSION',\s*'([^']+)'.*/\1/")
+          echo "Header: $header  Constant: $const"
+          if [ -z "$header" ] || [ "$header" != "$const" ]; then
+            echo "::error file=probackup/probackup.php::Version header ($header) and PROBACKUP_VERSION ($const) must match"
+            exit 1
+          fi
+          echo "version=$header" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$header" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v$header already exists — no release needed."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          tools: none
+
+      - name: Lint PHP (7.4)
+        run: find probackup -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Check JavaScript syntax
+        run: node --check probackup/assets/admin.js
+
+      - name: Build plugin zip
+        if: steps.ver.outputs.exists == 'false'
+        run: |
+          zip -r -X probackup.zip probackup -x '*.DS_Store' '*Thumbs.db'
+          unzip -l probackup.zip | tail -1
+
+      - name: Create release
+        if: steps.ver.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Changelog entry for this version from readme.txt (if present).
+          awk -v v="= $VERSION =" '$0==v{f=1;next} /^= /{f=0} f' probackup/readme.txt > notes.md || true
+          {
+            echo
+            echo "Install **probackup.zip** (not the \"Source code\" archive): Plugins → Add New → Upload Plugin → *Replace current with uploaded*."
+          } >> notes.md
+          gh release create "v$VERSION" probackup.zip \
+            --target "$GITHUB_SHA" \
+            --title "ProBackup $VERSION" \
+            --notes-file notes.md \
+            --generate-notes

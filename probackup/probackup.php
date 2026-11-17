@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       ProBackup – Site Migration
  * Description:       Lightweight whole-site migration. Chunked, resumable database export/import that never times out, plus encrypted peer-to-peer transfer powered by croc.
- * Version:           1.0.1
+ * Version:           1.0.2
  * Requires at least: 5.6
  * Requires PHP:      7.4
  * Author:            StratonAlly
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'PROBACKUP_VERSION', '1.0.1' );
+define( 'PROBACKUP_VERSION', '1.0.2' );
 define( 'PROBACKUP_FILE', __FILE__ );
 define( 'PROBACKUP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PROBACKUP_URL', plugin_dir_url( __FILE__ ) );

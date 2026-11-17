@@ -242,8 +242,7 @@
 		opts = opts || {};
 		var tabs = [['migrate', 'Migrate'], ['backups', 'Backups'], ['settings', 'Settings']];
 		app.innerHTML =
-			'<div class="pb-head"><h1>ProBackup</h1><span class="pb-version">v' + esc(C.version) + '</span><span class="pb-head__spacer"></span>' +
-				'<a class="pb-head__link" href="https://github.com/schollz/croc" target="_blank" rel="noopener">About croc ' + icon('ext') + '</a></div>' +
+			'<div class="pb-head"><h1>ProBackup</h1><span class="pb-version">v' + esc(C.version) + '</span></div>' +
 			'<p class="pb-lede">Move this WordPress site to another server — database, media, plugins and themes.</p>' +
 			'<nav class="pb-nav" aria-label="ProBackup sections">' + tabs.map(function (t) {
 				return '<button type="button" data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'is-active' : '') + '"' + (S.tab === t[0] ? ' aria-current="page"' : '') + (S.running ? ' disabled' : '') + '>' + t[1] +
