@@ -5,7 +5,8 @@ Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.4
 Stable tag: 1.0.2
-License: GPLv2 or later
+License: MIT
+License URI: https://opensource.org/licenses/MIT
 
 Lightweight whole-site migration with a chunked, resumable database import that does not time out — plus encrypted server-to-server transfer powered by croc.
 

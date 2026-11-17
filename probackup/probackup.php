@@ -6,7 +6,8 @@
  * Requires at least: 5.6
  * Requires PHP:      7.4
  * Author:            StratonAlly
- * License:           GPL-2.0-or-later
+ * License:           MIT
+ * License URI:       https://opensource.org/licenses/MIT
  * Text Domain:       probackup
  *
  * @package ProBackup
