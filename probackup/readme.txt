@@ -4,7 +4,7 @@ Tags: migration, backup, clone, move site, croc
 Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.0.3
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -56,6 +56,10 @@ In `wp-content/probackup-storage-<random>/backups/`, protected from web access.
 Not yet.
 
 == Changelog ==
+
+= 1.0.3 =
+* ProBackup is now released under the MIT License (license.txt included in the plugin).
+* New README with full documentation, and a contributing guide.
 
 = 1.0.2 =
 * Full-width admin screens, improved layout on tablets and phones.
