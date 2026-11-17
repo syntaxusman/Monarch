@@ -115,8 +115,9 @@ class PB_Plugin {
 		}
 		PB_Storage::ensure();
 		PB_Storage::cleanup_stale();
-		wp_enqueue_style( 'probackup', PROBACKUP_URL . 'assets/admin.css', array(), PROBACKUP_VERSION );
-		wp_enqueue_script( 'probackup', PROBACKUP_URL . 'assets/admin.js', array(), PROBACKUP_VERSION, true );
+		$ver = PROBACKUP_VERSION . '.' . (int) max( @filemtime( PROBACKUP_DIR . 'assets/admin.css' ), @filemtime( PROBACKUP_DIR . 'assets/admin.js' ) ); // phpcs:ignore -- cache-bust on every build
+		wp_enqueue_style( 'probackup', PROBACKUP_URL . 'assets/admin.css', array(), $ver );
+		wp_enqueue_script( 'probackup', PROBACKUP_URL . 'assets/admin.js', array(), $ver, true );
 
 		$max_upload = (int) wp_max_upload_size();
 		$post_max   = PB_Util::to_bytes( ini_get( 'post_max_size' ) );

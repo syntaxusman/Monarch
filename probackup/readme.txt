@@ -4,7 +4,7 @@ Tags: migration, backup, clone, move site, croc
 Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 
 Lightweight whole-site migration with a chunked, resumable database import that does not time out — plus encrypted server-to-server transfer powered by croc.
@@ -55,6 +55,10 @@ In `wp-content/probackup-storage-<random>/backups/`, protected from web access.
 Not yet.
 
 == Changelog ==
+
+= 1.0.1 =
+* Live, detailed activity log and redesigned admin screens.
+* Assets are cache-busted on every update.
 
 = 1.0.0 =
 * First release.
