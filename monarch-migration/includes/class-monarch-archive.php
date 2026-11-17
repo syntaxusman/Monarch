@@ -9,7 +9,7 @@
  * Append-only and seekable, so both writing and extracting can stop at any byte
  * and resume in the next request.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Archive reader/writer helpers.
  */
-class PB_Archive {
+class Monarch_Archive {
 
 	const MAGIC       = 'PBK1';
 	const END         = '__pbk_end__';
@@ -92,7 +92,7 @@ class PB_Archive {
 	 */
 	public static function add_file_piece( $fh, $src, $name, $cursor ) {
 		if ( empty( $cursor ) ) {
-			$size   = PB_Util::filesize( $src );
+			$size   = Monarch_Util::filesize( $src );
 			$cursor = array(
 				'size' => $size,
 				'done' => 0,
@@ -112,7 +112,7 @@ class PB_Archive {
 			}
 			fwrite( $fh, $data ); // phpcs:ignore
 			$cursor['done'] += strlen( $data );
-			if ( PB_Util::out_of_time() && $cursor['done'] < $cursor['size'] ) {
+			if ( Monarch_Util::out_of_time() && $cursor['done'] < $cursor['size'] ) {
 				break;
 			}
 		}
@@ -166,31 +166,31 @@ class PB_Archive {
 	public static function validate( $file ) {
 		$fh = @fopen( $file, 'rb' ); // phpcs:ignore
 		if ( ! $fh ) {
-			return new WP_Error( 'pb_open', __( 'Cannot open the backup file.', 'probackup' ) );
+			return new WP_Error( 'pb_open', __( 'Cannot open the backup file.', 'monarch-migration' ) );
 		}
 		if ( fread( $fh, 4 ) !== self::MAGIC ) { // phpcs:ignore
 			fclose( $fh ); // phpcs:ignore
-			return new WP_Error( 'pb_magic', __( 'This is not a ProBackup (.pbk) archive.', 'probackup' ) );
+			return new WP_Error( 'pb_magic', __( 'This is not a Monarch (.pbk) archive.', 'monarch-migration' ) );
 		}
 		$tail_len = self::HEADER_SIZE + strlen( self::END );
-		$size     = PB_Util::filesize( $file );
+		$size     = Monarch_Util::filesize( $file );
 		fseek( $fh, $size - $tail_len );
 		$tail = fread( $fh, $tail_len ); // phpcs:ignore
 		if ( substr( (string) $tail, -strlen( self::END ) ) !== self::END ) {
 			fclose( $fh ); // phpcs:ignore
-			return new WP_Error( 'pb_incomplete', __( 'The archive is incomplete or truncated (it was not fully transferred). Please transfer it again.', 'probackup' ) );
+			return new WP_Error( 'pb_incomplete', __( 'The archive is incomplete or truncated (it was not fully transferred). Please transfer it again.', 'monarch-migration' ) );
 		}
 		fseek( $fh, 4 );
 		$h = self::read_header( $fh );
 		if ( ! $h || 'package.json' !== $h['name'] || $h['size'] > 50 * 1048576 ) {
 			fclose( $fh ); // phpcs:ignore
-			return new WP_Error( 'pb_manifest', __( 'The archive manifest is missing.', 'probackup' ) );
+			return new WP_Error( 'pb_manifest', __( 'The archive manifest is missing.', 'monarch-migration' ) );
 		}
 		$json = $h['size'] > 0 ? fread( $fh, (int) $h['size'] ) : ''; // phpcs:ignore
 		fclose( $fh ); // phpcs:ignore
 		$manifest = json_decode( (string) $json, true );
 		if ( ! is_array( $manifest ) || empty( $manifest['siteurl'] ) ) {
-			return new WP_Error( 'pb_manifest', __( 'The archive manifest is corrupted.', 'probackup' ) );
+			return new WP_Error( 'pb_manifest', __( 'The archive manifest is corrupted.', 'monarch-migration' ) );
 		}
 		$manifest['archive_size'] = $size;
 		return $manifest;

@@ -1,9 +1,9 @@
-/* ProBackup admin app — vanilla JS, no build step. */
+/* Monarch admin app — vanilla JS, no build step. */
 (function () {
 	'use strict';
 
-	var C = window.ProBackup || {};
-	var app = document.getElementById('probackup-app');
+	var C = window.Monarch || {};
+	var app = document.getElementById('monarch-app');
 	if (!app) { return; }
 
 	/* ================= helpers ================= */
@@ -63,7 +63,7 @@
 		var attempt = 0;
 		function once() {
 			var fd = new FormData();
-			fd.append('action', 'probackup_step');
+			fd.append('action', 'monarch_step');
 			fd.append('nonce', C.nonce);
 			fd.append('sub', sub);
 			Object.keys(data || {}).forEach(function (k) {
@@ -180,7 +180,7 @@
 			on('[data-ldl]', 'click', function () {
 				var a = document.createElement('a');
 				a.href = URL.createObjectURL(new Blob([self.text()], { type: 'text/plain' }));
-				a.download = 'probackup-log-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.txt';
+				a.download = 'monarch-log-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.txt';
 				document.body.appendChild(a); a.click(); a.remove();
 			});
 			$$('[data-lf]').forEach(function (b) {
@@ -242,9 +242,9 @@
 		opts = opts || {};
 		var tabs = [['migrate', 'Migrate'], ['backups', 'Backups'], ['settings', 'Settings']];
 		app.innerHTML =
-			'<div class="pb-head"><h1>ProBackup</h1><span class="pb-version">v' + esc(C.version) + '</span></div>' +
+			'<div class="pb-head">' + (C.icon ? '<img class="pb-logo" src="' + esc(C.icon) + '" alt="" width="32" height="32">' : '') + '<h1>Monarch <span class="pb-sub">Site Migration</span></h1><span class="pb-version">v' + esc(C.version) + '</span></div>' +
 			'<p class="pb-lede">Move this WordPress site to another server — database, media, plugins and themes.</p>' +
-			'<nav class="pb-nav" aria-label="ProBackup sections">' + tabs.map(function (t) {
+			'<nav class="pb-nav" aria-label="Monarch sections">' + tabs.map(function (t) {
 				return '<button type="button" data-tab="' + t[0] + '" class="' + (S.tab === t[0] ? 'is-active' : '') + '"' + (S.tab === t[0] ? ' aria-current="page"' : '') + (S.running ? ' disabled' : '') + '>' + t[1] +
 					(t[0] === 'backups' ? '<span class="pb-count" data-bcount>' + S.backups.length + '</span>' : '') + '</button>';
 			}).join('') + '</nav>' +
@@ -296,7 +296,7 @@
 	/* ================= home ================= */
 	function viewHome() {
 		if (C.multisite) {
-			return render(notice('warn', 'Multisite is not supported yet.', 'ProBackup currently migrates single WordPress sites.'));
+			return render(notice('warn', 'Multisite is not supported yet.', 'Monarch currently migrates single WordPress sites.'));
 		}
 		render(
 			'<section class="pb-panel">' +
@@ -579,7 +579,7 @@
 			crumbs(['Choose content', 'Create package', 'Transfer'], 2) +
 			crocTransferPanel('Sending ' + file, 'Waiting for the destination site to connect…',
 				'<div class="pb-panel__body" style="border-top:1px solid var(--pb-border-soft)">' +
-					'<p style="margin-bottom:8px"><strong>On the destination site:</strong> ProBackup → Import → Receive with croc, then enter this code phrase:</p>' +
+					'<p style="margin-bottom:8px"><strong>On the destination site:</strong> Monarch → Import → Receive with croc, then enter this code phrase:</p>' +
 					'<div class="pb-code"><span>' + esc(s.code) + '</span><button type="button" class="pb-btn" data-copy="' + esc(s.code) + '" data-what="Code phrase">' + icon('copy') + 'Copy</button></div>' +
 					'<details style="margin-top:10px"><summary class="pb-muted" style="cursor:pointer">Receive on a computer instead</summary><p class="pb-cmd-label">Linux / macOS</p>' + cmd(s.manual.receive_unix) + '<p class="pb-cmd-label">Windows</p>' + cmd(s.manual.receive_win) + '</details>' +
 				'</div>')
@@ -699,7 +699,7 @@
 	}
 
 	function upload(file) {
-		if (!/\.pbk$/i.test(file.name)) { return toast('Choose a .pbk file created by ProBackup.', 'err'); }
+		if (!/\.pbk$/i.test(file.name)) { return toast('Choose a .pbk file created by Monarch.', 'err'); }
 		var name = safeName(file.name), size = file.size, stop = false;
 		S.running = true; S.started = Date.now();
 		Log.reset();

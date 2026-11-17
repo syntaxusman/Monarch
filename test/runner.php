@@ -1,6 +1,6 @@
 <?php
 /**
- * TEST HARNESS ONLY — never deploy. Drives ProBackup through its real AJAX router,
+ * TEST HARNESS ONLY — never deploy. Drives Monarch through its real AJAX router,
  * one HTTP request per step, with a tiny time budget to force many resumes.
  */
 $do = isset( $_GET['do'] ) ? $_GET['do'] : '';
@@ -19,14 +19,14 @@ if ( 'install' === $do ) {
 }
 
 require_once ABSPATH . 'wp-admin/includes/plugin.php';
-if ( ! is_plugin_active( 'probackup/probackup.php' ) ) {
-	activate_plugin( 'probackup/probackup.php' );
+if ( ! is_plugin_active( 'monarch-migration/monarch-migration.php' ) ) {
+	activate_plugin( 'monarch-migration/monarch-migration.php' );
 	echo 'activated';
 	exit;
 }
 wp_set_current_user( 1 );
 add_filter(
-	'probackup_time_budget',
+	'monarch_time_budget',
 	function () {
 		return isset( $_GET['budget'] ) ? (float) $_GET['budget'] : 0.3;
 	}
@@ -104,8 +104,8 @@ if ( 'fingerprint' === $do ) {
 			'small_files'   => count( (array) glob( "$up/2024/01/f*.txt" ) ),
 			'lang'          => is_file( WP_CONTENT_DIR . '/languages/x.po' ),
 			'leftover_tmp'  => $wpdb->get_col( "SHOW TABLES LIKE 'pb%'" ),
-			'backups'       => wp_list_pluck( PB_Storage::backups(), 'name' ),
-			'storage'       => PB_Storage::root(),
+			'backups'       => wp_list_pluck( Monarch_Storage::backups(), 'name' ),
+			'storage'       => Monarch_Storage::root(),
 		),
 		JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
 	);
@@ -114,8 +114,8 @@ if ( 'fingerprint' === $do ) {
 
 // Everything else goes through the real AJAX router.
 $_POST                = array_merge( $_GET, $_POST );
-$_POST['nonce']       = wp_create_nonce( 'probackup' );
-$_POST['action']      = 'probackup_step';
+$_POST['nonce']       = wp_create_nonce( 'monarch-migration' );
+$_POST['action']      = 'monarch_step';
 $_REQUEST             = $_POST;
 add_filter( 'wp_doing_ajax', '__return_true' );
-do_action( 'wp_ajax_probackup_step' );
+do_action( 'wp_ajax_monarch_step' );

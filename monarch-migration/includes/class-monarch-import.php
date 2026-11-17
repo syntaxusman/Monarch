@@ -5,7 +5,7 @@
  *
  * The live site keeps running on its own tables until the final, atomic RENAME.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Importer.
  */
-class PB_Import {
+class Monarch_Import {
 
 	/**
 	 * Inspect an archive for the confirmation screen.
@@ -24,7 +24,7 @@ class PB_Import {
 	 * @return array|WP_Error
 	 */
 	public static function inspect( $file ) {
-		$m = PB_Archive::validate( $file );
+		$m = Monarch_Archive::validate( $file );
 		if ( is_wp_error( $m ) ) {
 			return $m;
 		}
@@ -53,21 +53,21 @@ class PB_Import {
 	public static function start( $file, $extra ) {
 		global $wpdb;
 		if ( is_multisite() ) {
-			return new WP_Error( 'pb_ms', __( 'Multisite networks are not supported yet.', 'probackup' ) );
+			return new WP_Error( 'pb_ms', __( 'Multisite networks are not supported yet.', 'monarch-migration' ) );
 		}
-		$m = PB_Archive::validate( $file );
+		$m = Monarch_Archive::validate( $file );
 		if ( is_wp_error( $m ) ) {
 			return $m;
 		}
 		if ( ! empty( $m['multisite'] ) ) {
-			return new WP_Error( 'pb_ms', __( 'This backup comes from a multisite network, which is not supported yet.', 'probackup' ) );
+			return new WP_Error( 'pb_ms', __( 'This backup comes from a multisite network, which is not supported yet.', 'monarch-migration' ) );
 		}
 		$fh = fopen( $file, 'rb' ); // phpcs:ignore
 		fseek( $fh, 4 );
-		$h = PB_Archive::read_header( $fh );
+		$h = Monarch_Archive::read_header( $fh );
 		fseek( $fh, ftell( $fh ) + $h['size'] );
 		$hdr_pos = ftell( $fh );
-		$h2      = PB_Archive::read_header( $fh );
+		$h2      = Monarch_Archive::read_header( $fh );
 		$db      = null;
 		$content = $hdr_pos;
 		if ( $h2 && 'database.sql' === $h2['name'] ) {
@@ -82,17 +82,17 @@ class PB_Import {
 		}
 		fclose( $fh ); // phpcs:ignore
 
-		$id  = PB_Util::rand_id( 16 );
+		$id  = Monarch_Util::rand_id( 16 );
 		$job = array(
 			'id'         => $id,
 			'type'       => 'import',
 			'archive'    => $file,
 			'manifest'   => $m,
 			'stage'      => $db ? 'db' : 'files',
-			'tmp_prefix' => 'pbt' . PB_Util::rand_id( 4 ) . '_',
+			'tmp_prefix' => 'pbt' . Monarch_Util::rand_id( 4 ) . '_',
 			'live'       => $wpdb->prefix,
-			'caps'       => PB_DB_Import::server_caps(),
-			'budget'     => (int) PB_Storage::settings()['time_budget'],
+			'caps'       => Monarch_DB_Import::server_caps(),
+			'budget'     => (int) Monarch_Storage::settings()['time_budget'],
 			'db'         => $db,
 			'extra'      => $extra,
 			'replace'    => array(
@@ -118,14 +118,14 @@ class PB_Import {
 			'started'    => time(),
 		);
 		$caps = $job['caps'];
-		PB_Log::add( $job, sprintf( 'Import started: %s → %s', $m['home'], home_url() ), 'step' );
-		PB_Log::add( $job, sprintf( 'Package: %s · created %s · %s files · %s', basename( $file ), isset( $m['created'] ) ? $m['created'] : '?', PB_Log::num( isset( $m['files'] ) ? $m['files'] : 0 ), PB_Log::size( $m['archive_size'] ) ) );
-		PB_Log::add( $job, sprintf( 'Source: WordPress %s · PHP %s · MySQL %s · prefix "%s"', isset( $m['wp_version'] ) ? $m['wp_version'] : '?', isset( $m['php_version'] ) ? $m['php_version'] : '?', isset( $m['mysql_version'] ) ? $m['mysql_version'] : '?', $m['prefix'] ) );
-		PB_Log::add( $job, sprintf( 'This server: PHP %s · %s %s · prefix "%s" · max_allowed_packet %s · utf8mb4 %s', PHP_VERSION, false !== stripos( (string) $wpdb->db_server_info(), 'maria' ) ? 'MariaDB' : 'MySQL', $wpdb->db_version(), $wpdb->prefix, PB_Log::size( $caps['packet'] ), $caps['utf8mb4'] ? 'yes' : 'no' ) );
+		Monarch_Log::add( $job, sprintf( 'Import started: %s → %s', $m['home'], home_url() ), 'step' );
+		Monarch_Log::add( $job, sprintf( 'Package: %s · created %s · %s files · %s', basename( $file ), isset( $m['created'] ) ? $m['created'] : '?', Monarch_Log::num( isset( $m['files'] ) ? $m['files'] : 0 ), Monarch_Log::size( $m['archive_size'] ) ) );
+		Monarch_Log::add( $job, sprintf( 'Source: WordPress %s · PHP %s · MySQL %s · prefix "%s"', isset( $m['wp_version'] ) ? $m['wp_version'] : '?', isset( $m['php_version'] ) ? $m['php_version'] : '?', isset( $m['mysql_version'] ) ? $m['mysql_version'] : '?', $m['prefix'] ) );
+		Monarch_Log::add( $job, sprintf( 'This server: PHP %s · %s %s · prefix "%s" · max_allowed_packet %s · utf8mb4 %s', PHP_VERSION, false !== stripos( (string) $wpdb->db_server_info(), 'maria' ) ? 'MariaDB' : 'MySQL', $wpdb->db_version(), $wpdb->prefix, Monarch_Log::size( $caps['packet'] ), $caps['utf8mb4'] ? 'yes' : 'no' ) );
 		if ( $db ) {
-			PB_Log::add( $job, sprintf( 'Importing %s SQL statements (%s) into temporary tables "%s*" — your live site keeps running', PB_Log::num( $db['total'] ), PB_Log::size( $db['end'] - $db['pos'] ), $job['tmp_prefix'] ), 'step' );
+			Monarch_Log::add( $job, sprintf( 'Importing %s SQL statements (%s) into temporary tables "%s*" — your live site keeps running', Monarch_Log::num( $db['total'] ), Monarch_Log::size( $db['end'] - $db['pos'] ), $job['tmp_prefix'] ), 'step' );
 		}
-		PB_Storage::save_job( $job );
+		Monarch_Storage::save_job( $job );
 		return $job;
 	}
 
@@ -142,29 +142,29 @@ class PB_Import {
 		switch ( $job['stage'] ) {
 			case 'db':
 				$fh = fopen( $job['archive'], 'rb' ); // phpcs:ignore
-				$r  = PB_DB_Import::step( $job, $fh );
+				$r  = Monarch_DB_Import::step( $job, $fh );
 				fclose( $fh ); // phpcs:ignore
 				if ( 'done' === $r ) {
-					PB_Log::add( $job, sprintf( 'Database imported: %s statements%s', PB_Log::num( $job['db']['index'] ), $job['skipped'] ? ' (' . count( $job['skipped'] ) . ' skipped)' : '' ), 'ok' );
+					Monarch_Log::add( $job, sprintf( 'Database imported: %s statements%s', Monarch_Log::num( $job['db']['index'] ), $job['skipped'] ? ' (' . count( $job['skipped'] ) . ' skipped)' : '' ), 'ok' );
 					$job['stage'] = 'replace';
-					PB_Log::add( $job, 'Replacing old URLs and server paths (serialization-safe)…', 'step' );
+					Monarch_Log::add( $job, 'Replacing old URLs and server paths (serialization-safe)…', 'step' );
 				} elseif ( 'error' === $r ) {
-					PB_Log::add( $job, sprintf( 'Paused at statement #%d — waiting for your decision (Retry / Skip / Cancel)', $job['error']['statement'] ), 'err' );
+					Monarch_Log::add( $job, sprintf( 'Paused at statement #%d — waiting for your decision (Retry / Skip / Cancel)', $job['error']['statement'] ), 'err' );
 				}
 				break;
 			case 'replace':
 				if ( self::replace( $job ) ) {
-					PB_Log::add( $job, sprintf( 'URL & path replacement done: %s rows updated in %d tables', PB_Log::num( $job['replace']['updated'] ), is_array( $job['replace']['tables'] ) ? count( $job['replace']['tables'] ) : 0 ), 'ok' );
+					Monarch_Log::add( $job, sprintf( 'URL & path replacement done: %s rows updated in %d tables', Monarch_Log::num( $job['replace']['updated'] ), is_array( $job['replace']['tables'] ) ? count( $job['replace']['tables'] ) : 0 ), 'ok' );
 					$job['stage'] = 'files';
-					PB_Log::add( $job, 'Restoring wp-content files…', 'step' );
+					Monarch_Log::add( $job, 'Restoring wp-content files…', 'step' );
 				}
 				break;
 			case 'files':
 				if ( self::files( $job ) ) {
-					PB_Log::add( $job, sprintf( 'Files restored: %s files (%s)%s', PB_Log::num( $job['files']['count'] ), PB_Log::size( $job['files']['bytes'] ), $job['files']['skipped'] ? ', ' . PB_Log::num( $job['files']['skipped'] ) . ' skipped (ProBackup itself)' : '' ), 'ok' );
+					Monarch_Log::add( $job, sprintf( 'Files restored: %s files (%s)%s', Monarch_Log::num( $job['files']['count'] ), Monarch_Log::size( $job['files']['bytes'] ), $job['files']['skipped'] ? ', ' . Monarch_Log::num( $job['files']['skipped'] ) . ' skipped (Monarch itself)' : '' ), 'ok' );
 					$job['stage'] = $job['db'] ? 'swap' : 'done';
 					if ( $job['db'] ) {
-						PB_Log::add( $job, 'Activating the imported database…', 'step' );
+						Monarch_Log::add( $job, 'Activating the imported database…', 'step' );
 					}
 				}
 				break;
@@ -190,7 +190,7 @@ class PB_Import {
 				$p      = ( $job['db']['pos'] - ( $job['db']['end'] - $job['manifest']['db_size'] ) ) / max( 1, $job['manifest']['db_size'] );
 				$pct    = 60 * min( 1, max( 0, $p ) );
 				/* translators: 1: done, 2: total */
-				$detail = sprintf( __( 'Statement %1$s of %2$s', 'probackup' ), number_format_i18n( $job['db']['index'] ), number_format_i18n( $job['db']['total'] ) );
+				$detail = sprintf( __( 'Statement %1$s of %2$s', 'monarch-migration' ), number_format_i18n( $job['db']['index'] ), number_format_i18n( $job['db']['total'] ) );
 				break;
 			case 'replace':
 				$t      = is_array( $job['replace']['tables'] ) ? count( $job['replace']['tables'] ) : 1;
@@ -201,7 +201,7 @@ class PB_Import {
 				$total  = max( 1, $job['manifest']['archive_size'] - $job['files']['start'] );
 				$pct    = ( $job['db'] ? 70 : 0 ) + ( $job['db'] ? 27 : 97 ) * min( 1, ( $job['files']['pos'] - $job['files']['start'] ) / $total );
 				/* translators: %s: count */
-				$detail = sprintf( __( '%s files restored', 'probackup' ), number_format_i18n( $job['files']['count'] ) );
+				$detail = sprintf( __( '%s files restored', 'monarch-migration' ), number_format_i18n( $job['files']['count'] ) );
 				break;
 			case 'swap':
 				$pct = 98;
@@ -216,17 +216,17 @@ class PB_Import {
 			'stages'  => $stages,
 			'percent' => round( $pct, 1 ),
 			'label'   => $detail,
-			'log'     => PB_Log::since( $job ),
+			'log'     => Monarch_Log::since( $job ),
 			'seq'     => isset( $job['log_seq'] ) ? $job['log_seq'] : 0,
 			'stats'   => array(
-				'statements' => $job['db'] ? PB_Log::num( $job['db']['index'] ) . ' / ' . PB_Log::num( $job['db']['total'] ) : '—',
+				'statements' => $job['db'] ? Monarch_Log::num( $job['db']['index'] ) . ' / ' . Monarch_Log::num( $job['db']['total'] ) : '—',
 				'tables'     => $job['db'] ? ( isset( $job['db']['tables_done'] ) ? $job['db']['tables_done'] : 0 ) . ' / ' . ( isset( $job['manifest']['tables'] ) ? count( $job['manifest']['tables'] ) : 0 ) : '—',
-				'updated'    => PB_Log::num( $job['replace']['updated'] ),
-				'files'      => PB_Log::num( $job['files']['count'] ) . ' / ' . PB_Log::num( isset( $job['manifest']['files'] ) ? $job['manifest']['files'] : 0 ),
+				'updated'    => Monarch_Log::num( $job['replace']['updated'] ),
+				'files'      => Monarch_Log::num( $job['files']['count'] ) . ' / ' . Monarch_Log::num( isset( $job['manifest']['files'] ) ? $job['manifest']['files'] : 0 ),
 			),
 			'error'   => $job['error'],
 			'done'    => 'done' === $job['stage'],
-			'login'   => wp_login_url( admin_url( 'admin.php?page=probackup' ) ),
+			'login'   => wp_login_url( admin_url( 'admin.php?page=monarch-migration' ) ),
 			'source'  => $job['manifest']['home'],
 		);
 	}
@@ -238,11 +238,11 @@ class PB_Import {
 	 * @param string $action retry|skip.
 	 */
 	public static function resolve( &$job, $action ) {
-		$job['caps'] = PB_DB_Import::server_caps(); // The host may have changed settings (e.g. max_allowed_packet).
+		$job['caps'] = Monarch_DB_Import::server_caps(); // The host may have changed settings (e.g. max_allowed_packet).
 		if ( 'skip' === $action && 'db' === $job['stage'] ) {
 			$job['db']['skip'] = true;
 			/* translators: %d: statement */
-			PB_Export::log( $job, sprintf( __( 'Skipped statement #%d.', 'probackup' ), $job['error']['statement'] ) );
+			Monarch_Export::log( $job, sprintf( __( 'Skipped statement #%d.', 'monarch-migration' ), $job['error']['statement'] ) );
 		}
 		$job['error'] = null;
 	}
@@ -259,7 +259,7 @@ class PB_Import {
 		}
 		$tables = $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $job['tmp_prefix'] ) . '%' ) ); // phpcs:ignore
 		foreach ( (array) $tables as $t ) {
-			PB_Util::raw_query( 'DROP TABLE IF EXISTS ' . PB_Util::ident( $t ) );
+			Monarch_Util::raw_query( 'DROP TABLE IF EXISTS ' . Monarch_Util::ident( $t ) );
 		}
 	}
 
@@ -271,30 +271,30 @@ class PB_Import {
 	 */
 	private static function replace( &$job ) {
 		global $wpdb;
-		list( $pairs, $needles ) = PB_Replace::build( $job['manifest'], $job['extra'] );
-		$rep = new PB_Replace( $pairs, $needles );
+		list( $pairs, $needles ) = Monarch_Replace::build( $job['manifest'], $job['extra'] );
+		$rep = new Monarch_Replace( $pairs, $needles );
 		$r   = &$job['replace'];
 		if ( ! $rep->active() ) {
-			PB_Log::add( $job, 'Same URL and paths as the source — nothing to replace' );
+			Monarch_Log::add( $job, 'Same URL and paths as the source — nothing to replace' );
 			return true;
 		}
 		if ( null === $r['tables'] ) {
 			$r['tables'] = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $job['tmp_prefix'] ) . '%' ) ); // phpcs:ignore
 			$m           = $job['manifest'];
 			$shown       = array();
-			foreach ( array( array( $m['home'], home_url() ), array( $m['siteurl'], site_url() ), array( isset( $m['abspath'] ) ? $m['abspath'] : '', PB_Util::norm( ABSPATH ) ), array( isset( $m['content_dir'] ) ? $m['content_dir'] : '', PB_Util::norm( WP_CONTENT_DIR ) ) ) as $p ) {
+			foreach ( array( array( $m['home'], home_url() ), array( $m['siteurl'], site_url() ), array( isset( $m['abspath'] ) ? $m['abspath'] : '', Monarch_Util::norm( ABSPATH ) ), array( isset( $m['content_dir'] ) ? $m['content_dir'] : '', Monarch_Util::norm( WP_CONTENT_DIR ) ) ) as $p ) {
 				$k = untrailingslashit( $p[0] ) . '→' . untrailingslashit( $p[1] );
 				if ( '' !== $p[0] && untrailingslashit( $p[0] ) !== untrailingslashit( $p[1] ) && ! isset( $shown[ $k ] ) ) {
 					$shown[ $k ] = 1;
-					PB_Log::add( $job, sprintf( 'Replace "%s" → "%s" (plus https/http, //, JSON-escaped and URL-encoded variants)', untrailingslashit( $p[0] ), untrailingslashit( $p[1] ) ) );
+					Monarch_Log::add( $job, sprintf( 'Replace "%s" → "%s" (plus https/http, //, JSON-escaped and URL-encoded variants)', untrailingslashit( $p[0] ), untrailingslashit( $p[1] ) ) );
 				}
 			}
 			foreach ( (array) $job['extra'] as $e ) {
-				PB_Log::add( $job, sprintf( 'Custom replace "%s" → "%s"', $e[0], $e[1] ) );
+				Monarch_Log::add( $job, sprintf( 'Custom replace "%s" → "%s"', $e[0], $e[1] ) );
 			}
 		}
 		$req_scanned = 0;
-		while ( ! PB_Util::out_of_time() ) {
+		while ( ! Monarch_Util::out_of_time() ) {
 			if ( $r['ti'] >= count( $r['tables'] ) ) {
 				return true;
 			}
@@ -312,17 +312,17 @@ class PB_Import {
 				continue;
 			}
 			$select = array_unique( array_merge( $c['pk'], $c['text'] ) );
-			$sql    = 'SELECT ' . implode( ',', array_map( array( 'PB_Util', 'ident' ), $select ) ) . ' FROM ' . PB_Util::ident( $table );
+			$sql    = 'SELECT ' . implode( ',', array_map( array( 'Monarch_Util', 'ident' ), $select ) ) . ' FROM ' . Monarch_Util::ident( $table );
 			$limit  = (int) $r['batch'];
 			if ( $c['keyset'] ) {
-				$pk    = PB_Util::ident( $c['pk'][0] );
-				$where = null === $r['last'] ? '' : ' WHERE ' . $pk . " > '" . PB_Util::esc_sql_value( $r['last'] ) . "'";
+				$pk    = Monarch_Util::ident( $c['pk'][0] );
+				$where = null === $r['last'] ? '' : ' WHERE ' . $pk . " > '" . Monarch_Util::esc_sql_value( $r['last'] ) . "'";
 				$sql  .= $where . ' ORDER BY ' . $pk . ' LIMIT ' . $limit;
 			} elseif ( ! empty( $c['fullrow'] ) ) {
 				// No key: rely on the table's natural (insertion) order, which UPDATEs don't change.
 				$sql .= ' LIMIT ' . (int) $r['offset'] . ', ' . $limit;
 			} else {
-				$sql .= ' ORDER BY ' . implode( ',', array_map( array( 'PB_Util', 'ident' ), $c['pk'] ) ) . ' LIMIT ' . (int) $r['offset'] . ', ' . $limit;
+				$sql .= ' ORDER BY ' . implode( ',', array_map( array( 'Monarch_Util', 'ident' ), $c['pk'] ) ) . ' LIMIT ' . (int) $r['offset'] . ', ' . $limit;
 			}
 			$rows = $wpdb->get_results( $sql, ARRAY_A ); // phpcs:ignore
 			if ( empty( $rows ) ) {
@@ -341,16 +341,16 @@ class PB_Import {
 					$bytes += strlen( $v );
 					$nv     = $rep->value( $v );
 					if ( $nv !== $v ) {
-						$set[] = PB_Util::ident( $col ) . " = '" . PB_Util::esc_sql_value( $nv ) . "'";
+						$set[] = Monarch_Util::ident( $col ) . " = '" . Monarch_Util::esc_sql_value( $nv ) . "'";
 					}
 				}
 				if ( $set ) {
 					$w = array();
 					foreach ( $c['pk'] as $k ) {
 						// NULL-safe, byte-exact match (works for binary columns too).
-						$w[] = null === $row[ $k ] ? PB_Util::ident( $k ) . ' IS NULL' : PB_Util::ident( $k ) . " = UNHEX('" . bin2hex( $row[ $k ] ) . "')";
+						$w[] = null === $row[ $k ] ? Monarch_Util::ident( $k ) . ' IS NULL' : Monarch_Util::ident( $k ) . " = UNHEX('" . bin2hex( $row[ $k ] ) . "')";
 					}
-					PB_Util::raw_query( 'UPDATE ' . PB_Util::ident( $table ) . ' SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $w ) . ' LIMIT 1' );
+					Monarch_Util::raw_query( 'UPDATE ' . Monarch_Util::ident( $table ) . ' SET ' . implode( ', ', $set ) . ' WHERE ' . implode( ' AND ', $w ) . ' LIMIT 1' );
 					$r['updated']++;
 					$r['t_updated']++;
 				}
@@ -370,7 +370,7 @@ class PB_Import {
 			}
 		}
 		if ( $req_scanned > 0 && null !== $r['cols'] && isset( $r['tables'][ $r['ti'] ] ) ) {
-			PB_Log::add( $job, sprintf( '%s — %s rows scanned, %s updated so far', self::live_name( $job, $r['tables'][ $r['ti'] ] ), PB_Log::num( $r['t_scanned'] ), PB_Log::num( $r['t_updated'] ) ) );
+			Monarch_Log::add( $job, sprintf( '%s — %s rows scanned, %s updated so far', self::live_name( $job, $r['tables'][ $r['ti'] ] ), Monarch_Log::num( $r['t_scanned'] ), Monarch_Log::num( $r['t_updated'] ) ) );
 		}
 		return false;
 	}
@@ -394,9 +394,9 @@ class PB_Import {
 	 */
 	private static function replace_table_done( &$job, $table ) {
 		$r = $job['replace'];
-		PB_Log::add(
+		Monarch_Log::add(
 			$job,
-			sprintf( '%s — %s rows scanned, %s updated', self::live_name( $job, $table ), PB_Log::num( $r['t_scanned'] ), PB_Log::num( $r['t_updated'] ) ),
+			sprintf( '%s — %s rows scanned, %s updated', self::live_name( $job, $table ), Monarch_Log::num( $r['t_scanned'] ), Monarch_Log::num( $r['t_updated'] ) ),
 			$r['t_updated'] > 0 ? 'ok' : 'info'
 		);
 	}
@@ -426,7 +426,7 @@ class PB_Import {
 		$pk      = array();
 		$uniq    = array();
 		$numeric = false;
-		foreach ( (array) $wpdb->get_results( 'SHOW COLUMNS FROM ' . PB_Util::ident( $table ), ARRAY_A ) as $col ) { // phpcs:ignore
+		foreach ( (array) $wpdb->get_results( 'SHOW COLUMNS FROM ' . Monarch_Util::ident( $table ), ARRAY_A ) as $col ) { // phpcs:ignore
 			$type = strtolower( $col['Type'] );
 			if ( 'PRI' === $col['Key'] ) {
 				$pk[]    = $col['Field'];
@@ -442,7 +442,7 @@ class PB_Import {
 		$fullrow = false;
 		if ( empty( $pk ) ) {
 			// Fall back to the first UNIQUE index.
-			$keys = $wpdb->get_results( 'SHOW KEYS FROM ' . PB_Util::ident( $table ) . ' WHERE Non_unique = 0', ARRAY_A ); // phpcs:ignore
+			$keys = $wpdb->get_results( 'SHOW KEYS FROM ' . Monarch_Util::ident( $table ) . ' WHERE Non_unique = 0', ARRAY_A ); // phpcs:ignore
 			foreach ( (array) $keys as $k ) {
 				$uniq[ $k['Key_name'] ][] = $k['Column_name'];
 			}
@@ -453,7 +453,7 @@ class PB_Import {
 		if ( empty( $pk ) ) {
 			// No key at all: identify rows by every column's original value.
 			$fullrow = true;
-			foreach ( (array) $wpdb->get_col( 'SHOW COLUMNS FROM ' . PB_Util::ident( $table ) ) as $c ) { // phpcs:ignore
+			foreach ( (array) $wpdb->get_col( 'SHOW COLUMNS FROM ' . Monarch_Util::ident( $table ) ) as $c ) { // phpcs:ignore
 				$pk[] = $c;
 			}
 		}
@@ -474,30 +474,30 @@ class PB_Import {
 	private static function files( &$job ) {
 		$f       = &$job['files'];
 		$fh      = fopen( $job['archive'], 'rb' ); // phpcs:ignore
-		$root    = PB_Util::norm( WP_CONTENT_DIR );
-		$self    = 'plugins/' . dirname( PROBACKUP_BASENAME ) . '/';
-		$storage = basename( PB_Storage::root() );
+		$root    = Monarch_Util::norm( WP_CONTENT_DIR );
+		$self    = 'plugins/' . dirname( MONARCH_BASENAME ) . '/';
+		$storage = basename( Monarch_Storage::root() );
 		$done     = false;
 		$lastdir  = '';
 		$c_before = $f['count'];
 		$b_before = $f['bytes'];
 		$last_rel = '';
-		while ( ! PB_Util::out_of_time() ) {
+		while ( ! Monarch_Util::out_of_time() ) {
 			if ( null === $f['cur'] ) {
 				fseek( $fh, $f['pos'] );
-				$h = PB_Archive::read_header( $fh );
+				$h = Monarch_Archive::read_header( $fh );
 				if ( ! $h ) {
 					throw new Exception( 'The archive is corrupted near byte ' . $f['pos'] . '.' );
 				}
-				if ( PB_Archive::END === $h['name'] ) {
+				if ( Monarch_Archive::END === $h['name'] ) {
 					$done = true;
 					break;
 				}
 				$target = null;
-				$rel    = PB_Archive::safe_path( $h['name'] );
+				$rel    = Monarch_Archive::safe_path( $h['name'] );
 				if ( $rel && 0 === strpos( $rel, 'content/' ) ) {
 					$rel = substr( $rel, 8 );
-					if ( 0 !== strpos( $rel, $self ) && 0 !== strpos( $rel, $storage ) && 0 !== strpos( $rel, 'probackup-storage' ) ) {
+					if ( 0 !== strpos( $rel, $self ) && 0 !== strpos( $rel, $storage ) && 0 !== strpos( $rel, 'monarch-storage' ) && 0 !== strpos( $rel, 'probackup-storage' ) ) {
 						$target = $root . '/' . $rel;
 					}
 				}
@@ -523,7 +523,7 @@ class PB_Import {
 				}
 				$out = @fopen( $cur['target'], 'c+b' ); // phpcs:ignore
 				if ( ! $out ) {
-					PB_Log::add( $job, sprintf( 'Could not write %s — check folder permissions (skipped)', str_replace( $root . '/', '', $cur['target'] ) ), 'warn' );
+					Monarch_Log::add( $job, sprintf( 'Could not write %s — check folder permissions (skipped)', str_replace( $root . '/', '', $cur['target'] ) ), 'warn' );
 					$cur['target'] = null;
 				} else {
 					$last_rel = str_replace( $root . '/', '', $cur['target'] );
@@ -531,7 +531,7 @@ class PB_Import {
 					fseek( $out, $cur['done'] );
 					fseek( $fh, $cur['data'] + $cur['done'] );
 					while ( $cur['done'] < $cur['size'] ) {
-						$chunk = fread( $fh, (int) min( PB_Archive::PIECE, $cur['size'] - $cur['done'] ) ); // phpcs:ignore
+						$chunk = fread( $fh, (int) min( Monarch_Archive::PIECE, $cur['size'] - $cur['done'] ) ); // phpcs:ignore
 						if ( false === $chunk || '' === $chunk ) {
 							fclose( $out ); // phpcs:ignore
 							throw new Exception( 'Unexpected end of archive.' );
@@ -539,17 +539,17 @@ class PB_Import {
 						fwrite( $out, $chunk ); // phpcs:ignore
 						$cur['done']  += strlen( $chunk );
 						$f['bytes']   += strlen( $chunk );
-						if ( $cur['done'] < $cur['size'] && PB_Util::out_of_time() ) {
+						if ( $cur['done'] < $cur['size'] && Monarch_Util::out_of_time() ) {
 							break;
 						}
 					}
 					fclose( $out ); // phpcs:ignore
 					if ( $cur['done'] < $cur['size'] ) {
-						PB_Log::add( $job, sprintf( 'Restoring large file %s… %d%% (%s of %s)', $last_rel, floor( $cur['done'] / max( 1, $cur['size'] ) * 100 ), PB_Log::size( $cur['done'] ), PB_Log::size( $cur['size'] ) ) );
+						Monarch_Log::add( $job, sprintf( 'Restoring large file %s… %d%% (%s of %s)', $last_rel, floor( $cur['done'] / max( 1, $cur['size'] ) * 100 ), Monarch_Log::size( $cur['done'] ), Monarch_Log::size( $cur['size'] ) ) );
 						break; // Resume this file next request.
 					}
 					if ( $cur['size'] >= 20971520 ) {
-						PB_Log::add( $job, sprintf( 'Restored large file %s (%s)', $last_rel, PB_Log::size( $cur['size'] ) ) );
+						Monarch_Log::add( $job, sprintf( 'Restored large file %s (%s)', $last_rel, Monarch_Log::size( $cur['size'] ) ) );
 					}
 					if ( $cur['mtime'] ) {
 						@touch( $cur['target'], $cur['mtime'] ); // phpcs:ignore
@@ -563,7 +563,7 @@ class PB_Import {
 		}
 		fclose( $fh ); // phpcs:ignore
 		if ( $f['count'] > $c_before ) {
-			PB_Log::add( $job, sprintf( 'Restored %s files (%s) · %s / %s total · last: %s', PB_Log::num( $f['count'] - $c_before ), PB_Log::size( $f['bytes'] - $b_before ), PB_Log::num( $f['count'] ), PB_Log::num( isset( $job['manifest']['files'] ) ? $job['manifest']['files'] : 0 ), $last_rel ) );
+			Monarch_Log::add( $job, sprintf( 'Restored %s files (%s) · %s / %s total · last: %s', Monarch_Log::num( $f['count'] - $c_before ), Monarch_Log::size( $f['bytes'] - $b_before ), Monarch_Log::num( $f['count'] ), Monarch_Log::num( isset( $job['manifest']['files'] ) ? $job['manifest']['files'] : 0 ), $last_rel ) );
 		}
 		if ( function_exists( 'opcache_reset' ) && $done ) {
 			@opcache_reset(); // phpcs:ignore
@@ -572,7 +572,7 @@ class PB_Import {
 	}
 
 	/**
-	 * Final step: fix prefix-dependent rows, keep this site's URL and ProBackup
+	 * Final step: fix prefix-dependent rows, keep this site's URL and Monarch
 	 * settings, then atomically swap the temporary tables in.
 	 *
 	 * @param array $job Job.
@@ -582,53 +582,53 @@ class PB_Import {
 		$tmp  = $job['tmp_prefix'];
 		$live = $job['live'];
 		$src  = $job['manifest']['prefix'];
-		$opt  = PB_Util::ident( $tmp . 'options' );
-		$um   = PB_Util::ident( $tmp . 'usermeta' );
+		$opt  = Monarch_Util::ident( $tmp . 'options' );
+		$um   = Monarch_Util::ident( $tmp . 'usermeta' );
 		$has  = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $tmp ) . '%' ) ); // phpcs:ignore
 
 		if ( ! in_array( $tmp . 'options', $has, true ) ) {
 			$job['error'] = array(
 				'stage'   => 'swap',
-				'message' => __( 'The backup does not contain an options table, so it cannot be activated.', 'probackup' ),
+				'message' => __( 'The backup does not contain an options table, so it cannot be activated.', 'monarch-migration' ),
 			);
 			return;
 		}
 
 		if ( $src !== $live ) {
-			PB_Util::raw_query( "UPDATE $opt SET option_name = '" . PB_Util::esc_sql_value( $live . 'user_roles' ) . "' WHERE option_name = '" . PB_Util::esc_sql_value( $src . 'user_roles' ) . "'" );
+			Monarch_Util::raw_query( "UPDATE $opt SET option_name = '" . Monarch_Util::esc_sql_value( $live . 'user_roles' ) . "' WHERE option_name = '" . Monarch_Util::esc_sql_value( $src . 'user_roles' ) . "'" );
 			if ( in_array( $tmp . 'usermeta', $has, true ) ) {
-				$n = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $um WHERE meta_key LIKE '" . PB_Util::esc_sql_value( PB_Util::esc_like( $src ) ) . "%'" ); // phpcs:ignore
-				PB_Util::raw_query( "UPDATE $um SET meta_key = CONCAT('" . PB_Util::esc_sql_value( $live ) . "', SUBSTRING(meta_key, " . ( strlen( $src ) + 1 ) . ")) WHERE meta_key LIKE '" . PB_Util::esc_sql_value( PB_Util::esc_like( $src ) ) . "%'" );
-				PB_Log::add( $job, sprintf( 'Table prefix changed "%s" → "%s": renamed user_roles and %s user meta keys (capabilities, user level, …)', $src, $live, PB_Log::num( $n ) ) );
+				$n = (int) $wpdb->get_var( "SELECT COUNT(*) FROM $um WHERE meta_key LIKE '" . Monarch_Util::esc_sql_value( Monarch_Util::esc_like( $src ) ) . "%'" ); // phpcs:ignore
+				Monarch_Util::raw_query( "UPDATE $um SET meta_key = CONCAT('" . Monarch_Util::esc_sql_value( $live ) . "', SUBSTRING(meta_key, " . ( strlen( $src ) + 1 ) . ")) WHERE meta_key LIKE '" . Monarch_Util::esc_sql_value( Monarch_Util::esc_like( $src ) ) . "%'" );
+				Monarch_Log::add( $job, sprintf( 'Table prefix changed "%s" → "%s": renamed user_roles and %s user meta keys (capabilities, user level, …)', $src, $live, Monarch_Log::num( $n ) ) );
 			}
 		}
-		PB_Log::add( $job, sprintf( 'Kept this site\'s address (%s) and ProBackup settings; cleared caches, cron and rewrite rules', home_url() ) );
+		Monarch_Log::add( $job, sprintf( 'Kept this site\'s address (%s) and Monarch settings; cleared caches, cron and rewrite rules', home_url() ) );
 
-		// Keep this site's address and ProBackup's own settings.
+		// Keep this site's address and Monarch's own settings.
 		$keep = array(
 			'siteurl'                    => get_option( 'siteurl' ),
 			'home'                       => get_option( 'home' ),
-			PB_Storage::OPTION_DIR      => get_option( PB_Storage::OPTION_DIR ),
-			PB_Storage::OPTION_SETTINGS => maybe_serialize( PB_Storage::settings() ),
+			Monarch_Storage::OPTION_DIR      => get_option( Monarch_Storage::OPTION_DIR ),
+			Monarch_Storage::OPTION_SETTINGS => maybe_serialize( Monarch_Storage::settings() ),
 		);
 		foreach ( $keep as $name => $value ) {
-			PB_Util::raw_query( "DELETE FROM $opt WHERE option_name = '" . PB_Util::esc_sql_value( $name ) . "'" );
-			PB_Util::raw_query( "INSERT INTO $opt (option_name, option_value, autoload) VALUES ('" . PB_Util::esc_sql_value( $name ) . "', '" . PB_Util::esc_sql_value( $value ) . "', 'yes')" );
+			Monarch_Util::raw_query( "DELETE FROM $opt WHERE option_name = '" . Monarch_Util::esc_sql_value( $name ) . "'" );
+			Monarch_Util::raw_query( "INSERT INTO $opt (option_name, option_value, autoload) VALUES ('" . Monarch_Util::esc_sql_value( $name ) . "', '" . Monarch_Util::esc_sql_value( $value ) . "', 'yes')" );
 		}
-		PB_Util::raw_query( "DELETE FROM $opt WHERE option_name IN ('rewrite_rules','cron') OR option_name LIKE '\\_transient\\_%' OR option_name LIKE '\\_site\\_transient\\_%'" );
+		Monarch_Util::raw_query( "DELETE FROM $opt WHERE option_name IN ('rewrite_rules','cron') OR option_name LIKE '\\_transient\\_%' OR option_name LIKE '\\_site\\_transient\\_%'" );
 
-		// Make sure ProBackup stays active.
+		// Make sure Monarch stays active.
 		$active = $wpdb->get_var( "SELECT option_value FROM $opt WHERE option_name = 'active_plugins'" ); // phpcs:ignore
 		$list   = is_string( $active ) ? @unserialize( $active, array( 'allowed_classes' => false ) ) : array(); // phpcs:ignore
-		$list   = is_array( $list ) ? array_values( $list ) : array();
-		if ( ! in_array( PROBACKUP_BASENAME, $list, true ) ) {
-			$list[] = PROBACKUP_BASENAME;
-			PB_Util::raw_query( "DELETE FROM $opt WHERE option_name = 'active_plugins'" );
-			PB_Util::raw_query( "INSERT INTO $opt (option_name, option_value, autoload) VALUES ('active_plugins', '" . PB_Util::esc_sql_value( serialize( $list ) ) . "', 'yes')" ); // phpcs:ignore
+		$list   = is_array( $list ) ? array_values( array_diff( $list, array( 'probackup/probackup.php' ) ) ) : array(); // Drop the plugin's former name.
+		if ( ! in_array( MONARCH_BASENAME, $list, true ) ) {
+			$list[] = MONARCH_BASENAME;
+			Monarch_Util::raw_query( "DELETE FROM $opt WHERE option_name = 'active_plugins'" );
+			Monarch_Util::raw_query( "INSERT INTO $opt (option_name, option_value, autoload) VALUES ('active_plugins', '" . Monarch_Util::esc_sql_value( serialize( $list ) ) . "', 'yes')" ); // phpcs:ignore
 		}
 
 		// Atomic swap.
-		$old_prefix = 'pbo' . PB_Util::rand_id( 4 ) . '_';
+		$old_prefix = 'pbo' . Monarch_Util::rand_id( 4 ) . '_';
 		$live_list  = (array) $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $live ) . '%' ) ); // phpcs:ignore
 		$renames    = array();
 		$olds       = array();
@@ -638,29 +638,29 @@ class PB_Import {
 			if ( strlen( $new ) > 64 ) {
 				$new = $old_prefix . substr( md5( $short ), 0, 24 );
 			}
-			$renames[] = PB_Util::ident( $t ) . ' TO ' . PB_Util::ident( $new );
+			$renames[] = Monarch_Util::ident( $t ) . ' TO ' . Monarch_Util::ident( $new );
 			$olds[]    = $new;
 		}
 		foreach ( $has as $t ) {
-			$renames[] = PB_Util::ident( $t ) . ' TO ' . PB_Util::ident( $live . substr( $t, strlen( $tmp ) ) );
+			$renames[] = Monarch_Util::ident( $t ) . ' TO ' . Monarch_Util::ident( $live . substr( $t, strlen( $tmp ) ) );
 		}
 		$t0               = microtime( true );
-		list( $ok, $err ) = PB_Util::raw_query( 'RENAME TABLE ' . implode( ', ', $renames ) );
+		list( $ok, $err ) = Monarch_Util::raw_query( 'RENAME TABLE ' . implode( ', ', $renames ) );
 		if ( ! $ok ) {
-			PB_Log::add( $job, 'Atomic table swap failed: ' . $err . ' — your live site was not changed', 'err' );
+			Monarch_Log::add( $job, 'Atomic table swap failed: ' . $err . ' — your live site was not changed', 'err' );
 			$job['error'] = array(
 				'stage'   => 'swap',
-				'message' => __( 'Could not activate the imported tables: ', 'probackup' ) . $err,
+				'message' => __( 'Could not activate the imported tables: ', 'monarch-migration' ) . $err,
 			);
 			return;
 		}
-		PB_Log::add( $job, sprintf( 'Atomic swap in %s ms: %d old tables moved aside, %d imported tables activated', round( ( microtime( true ) - $t0 ) * 1000 ), count( $olds ), count( $has ) ), 'ok' );
+		Monarch_Log::add( $job, sprintf( 'Atomic swap in %s ms: %d old tables moved aside, %d imported tables activated', round( ( microtime( true ) - $t0 ) * 1000 ), count( $olds ), count( $has ) ), 'ok' );
 		foreach ( $olds as $t ) {
-			PB_Util::raw_query( 'DROP TABLE IF EXISTS ' . PB_Util::ident( $t ) );
+			Monarch_Util::raw_query( 'DROP TABLE IF EXISTS ' . Monarch_Util::ident( $t ) );
 		}
-		PB_Log::add( $job, sprintf( 'Dropped %d previous tables', count( $olds ) ) );
+		Monarch_Log::add( $job, sprintf( 'Dropped %d previous tables', count( $olds ) ) );
 		wp_cache_flush();
 		$job['stage'] = 'done';
-		PB_Log::add( $job, sprintf( 'Migration complete in %s. Log in with the SOURCE site\'s username and password.', human_time_diff( $job['started'], time() ) ), 'ok' );
+		Monarch_Log::add( $job, sprintf( 'Migration complete in %s. Log in with the SOURCE site\'s username and password.', human_time_diff( $job['started'], time() ) ), 'ok' );
 	}
 }

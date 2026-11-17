@@ -1,13 +1,13 @@
-# Contributing to ProBackup
+# Contributing to Monarch
 
-Thanks for helping improve ProBackup. This guide explains how to report problems, set up a development environment, and get a change merged.
+Thanks for helping improve Monarch. This guide explains how to report problems, set up a development environment, and get a change merged.
 
 ## Reporting bugs
 
 Open an [issue](https://github.com/zubbicodes/ProBackup/issues) and include:
 
 - What you did, what you expected, and what happened instead.
-- **The activity log.** In ProBackup, use the log's *Download* button and attach the `.txt` file. It already contains server versions, table names, row counts and any errors.
+- **The activity log.** In Monarch, use the log's *Download* button and attach the `.txt` file. It already contains server versions, table names, row counts and any errors.
 - Source and destination environment: WordPress, PHP, and MySQL/MariaDB versions, plus your hosting provider if you know it.
 - For database import errors: the statement number and error message from the error box. If you can share it, add the SQL shown under *Show SQL*.
 
@@ -36,7 +36,7 @@ You don't need PHP installed locally; the tests run PHP inside Docker.
 
 ```bash
 git clone https://github.com/zubbicodes/ProBackup.git
-cd ProBackup
+cd Monarch
 cd test && docker compose up -d
 ```
 
@@ -47,7 +47,7 @@ This starts two WordPress sites built to be as different as possible:
 | Source | http://localhost:8081 | 7.4 | MySQL 8 | `src_` |
 | Destination | http://localhost:8082 | 8.3 | MariaDB 10.4, `max_allowed_packet` = 256 KB | `dst_` |
 
-The `probackup/` folder is mounted into both sites, so your edits apply immediately. No build step is needed.
+The `monarch-migration/` folder is mounted into both sites, so your edits apply immediately. No build step is needed.
 
 ### Running the end-to-end test
 
@@ -79,46 +79,46 @@ docker compose down -v
 
 ```bash
 # PHP syntax on the oldest and newest supported versions
-docker run --rm -v "$PWD/probackup:/p" php:7.4-cli sh -c 'find /p -name "*.php" -exec php -l {} \;'
-docker run --rm -v "$PWD/probackup:/p" php:8.3-cli sh -c 'find /p -name "*.php" -exec php -l {} \;'
+docker run --rm -v "$PWD/monarch-migration:/p" php:7.4-cli sh -c 'find /p -name "*.php" -exec php -l {} \;'
+docker run --rm -v "$PWD/monarch-migration:/p" php:8.3-cli sh -c 'find /p -name "*.php" -exec php -l {} \;'
 
 # JavaScript syntax
-node --check probackup/assets/admin.js
+node --check monarch-migration/assets/admin.js
 ```
 
 GitHub Actions runs the PHP 7.4 and JavaScript checks on every push to `main`.
 
 ## Code guidelines
 
-ProBackup has to work on cheap shared hosting, so these rules matter more than usual.
+Monarch has to work on cheap shared hosting, so these rules matter more than usual.
 
 ### General
 
 - **No dependencies.** Plain PHP 7.4+, vanilla JavaScript and CSS: no Composer packages, npm packages or build step.
 - **Follow the [WordPress Coding Standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/):** tabs, Yoda conditions, `array()` syntax and DocBlocks on every method.
-- **Classes are autoloaded.** `PB_Foo_Bar` lives in `probackup/includes/class-pb-foo-bar.php`.
-- **Prefix everything.** Options, hooks, AJAX actions and CSS classes use `probackup` / `pb-`.
+- **Classes are autoloaded.** `Monarch_Foo_Bar` lives in `monarch-migration/includes/class-monarch-foo-bar.php`.
+- **Prefix everything.** Options, hooks, AJAX actions and CSS classes use `monarch-migration` / `pb-`.
 
 ### Long-running work
 
 - **Never do unbounded work in one request.** Every long operation is a step function that:
-  - checks `PB_Util::time_up()`, which covers both the time budget and memory;
+  - checks `Monarch_Util::time_up()`, which covers both the time budget and memory;
   - saves its cursor in the job state;
   - returns, so the browser can call it again.
 - **Never load a whole file or table into memory.** Stream with `fopen`/`fgets`/`fread` and paginate queries.
 - **Make every step resumable and idempotent.** A request can be killed at any moment, and running the step again must still give a correct result.
-- **Log what the user would want to know.** Use `PB_Log::add( $job, $message, $level )` with `info`, `ok`, `warn`, `err` or `step`. Write messages in plain language and include numbers (rows, bytes, tables).
+- **Log what the user would want to know.** Use `Monarch_Log::add( $job, $message, $level )` with `info`, `ok`, `warn`, `err` or `step`. Write messages in plain language and include numbers (rows, bytes, tables).
 
 ### Security
 
-- Every AJAX sub-action checks the nonce and the `manage_options` capability. Add new sub-actions to the whitelist in `PB_Plugin`.
+- Every AJAX sub-action checks the nonce and the `manage_options` capability. Add new sub-actions to the whitelist in `Monarch_Plugin`.
 - Escape all output, sanitize all input, and pass shell arguments through `escapeshellarg()`.
 - Validate file names and archive paths. The archive reader rejects absolute paths and `..`.
 
 ### Database compatibility
 
 - Test against both MySQL 8 and MariaDB. The Docker setup already gives you one of each.
-- If you add an automatic repair to `PB_DB_Import`, log it as a `warn` entry so users can see what changed.
+- If you add an automatic repair to `Monarch_DB_Import`, log it as a `warn` entry so users can see what changed.
 
 ## Submitting a pull request
 
@@ -134,16 +134,16 @@ ProBackup has to work on cheap shared hosting, so these rules matter more than u
 Maintainers release by bumping the version number. Nothing else needs to be done by hand.
 
 1. Update the version in three places:
-   - the `Version:` header in `probackup/probackup.php`;
-   - the `PROBACKUP_VERSION` constant in the same file;
-   - `Stable tag:` in `probackup/readme.txt`.
-2. Add a `= x.y.z =` section at the top of the changelog in `probackup/readme.txt`.
+   - the `Version:` header in `monarch-migration/monarch-migration.php`;
+   - the `MONARCH_VERSION` constant in the same file;
+   - `Stable tag:` in `monarch-migration/readme.txt`.
+2. Add a `= x.y.z =` section at the top of the changelog in `monarch-migration/readme.txt`.
 3. Push to `main`.
 
 The [Release workflow](.github/workflows/release.yml) then:
 - checks that both version numbers match;
 - lints the code;
-- builds `probackup.zip`;
+- builds `monarch-migration.zip`;
 - publishes release `vX.Y.Z` with the changelog entry as release notes.
 
 Pushes that don't change the version only run the checks.

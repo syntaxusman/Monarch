@@ -7,7 +7,7 @@
  * objects of classes that don't exist on this site. String lengths are
  * recalculated exactly.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Replacer.
  */
-class PB_Replace {
+class Monarch_Replace {
 
 	/**
 	 * Search => replace map (applied with strtr, longest match first, one pass).
@@ -86,12 +86,12 @@ class PB_Replace {
 			}
 		}
 		$paths = array(
-			array( isset( $manifest['abspath'] ) ? $manifest['abspath'] : '', PB_Util::norm( ABSPATH ) ),
-			array( isset( $manifest['content_dir'] ) ? $manifest['content_dir'] : '', PB_Util::norm( WP_CONTENT_DIR ) ),
+			array( isset( $manifest['abspath'] ) ? $manifest['abspath'] : '', Monarch_Util::norm( ABSPATH ) ),
+			array( isset( $manifest['content_dir'] ) ? $manifest['content_dir'] : '', Monarch_Util::norm( WP_CONTENT_DIR ) ),
 		);
 		foreach ( $paths as $p ) {
-			$old = PB_Util::norm( $p[0] );
-			$new = PB_Util::norm( $p[1] );
+			$old = Monarch_Util::norm( $p[0] );
+			$new = Monarch_Util::norm( $p[1] );
 			if ( strlen( $old ) < 4 || $old === $new ) {
 				continue;
 			}

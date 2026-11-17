@@ -2,14 +2,14 @@
 /**
  * Chunked, resumable database dump.
  *
- * Output format (consumed by PB_DB_Import):
+ * Output format (consumed by Monarch_DB_Import):
  *   -- PB-STMT
  *   <one SQL statement, ending with ";">
  * Rows are written one per line (newlines inside values are escaped), so the
  * importer can split statements and even split huge INSERTs by line without
  * parsing SQL quoting.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Database exporter.
  */
-class PB_DB_Dump {
+class Monarch_DB_Dump {
 
 	const MARKER        = '-- PB-STMT';
 	const PREFIX_TOKEN  = '{{PB_PREFIX}}';
@@ -76,7 +76,7 @@ class PB_DB_Dump {
 		$cols    = array();
 		$pk      = array();
 		$numeric = false;
-		$info    = $wpdb->get_results( 'SHOW COLUMNS FROM ' . PB_Util::ident( $name ), ARRAY_A ); // phpcs:ignore
+		$info    = $wpdb->get_results( 'SHOW COLUMNS FROM ' . Monarch_Util::ident( $name ), ARRAY_A ); // phpcs:ignore
 		foreach ( (array) $info as $c ) {
 			$type   = strtolower( $c['Type'] );
 			$cols[] = array(
@@ -102,7 +102,7 @@ class PB_DB_Dump {
 		}
 		$count = $estimate;
 		if ( $estimate < 200000 ) {
-			$count = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . PB_Util::ident( $name ) . ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' ) ); // phpcs:ignore
+			$count = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Monarch_Util::ident( $name ) . ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' ) ); // phpcs:ignore
 		}
 		return array(
 			'name'   => $name,
@@ -141,37 +141,37 @@ class PB_DB_Dump {
 		$st        = &$job['db'];
 		$req_rows  = 0;
 		$req_table = '';
-		$fh = PB_Archive::open_append( $file, $st['sql_size'] );
+		$fh = Monarch_Archive::open_append( $file, $st['sql_size'] );
 		if ( ! $fh ) {
 			throw new Exception( 'Cannot write the database dump file. Check free disk space and permissions.' );
 		}
 		$done = false;
-		while ( ! PB_Util::out_of_time() ) {
+		while ( ! Monarch_Util::out_of_time() ) {
 			if ( $st['ti'] >= count( $st['tables'] ) ) {
 				$done = true;
 				break;
 			}
 			$tb    = $st['tables'][ $st['ti'] ];
-			$token = PB_Util::ident( self::PREFIX_TOKEN . $tb['short'] );
+			$token = Monarch_Util::ident( self::PREFIX_TOKEN . $tb['short'] );
 
 			if ( 'schema' === $st['stage'] ) {
-				$create = $wpdb->get_row( 'SHOW CREATE TABLE ' . PB_Util::ident( $tb['name'] ), ARRAY_N ); // phpcs:ignore
+				$create = $wpdb->get_row( 'SHOW CREATE TABLE ' . Monarch_Util::ident( $tb['name'] ), ARRAY_N ); // phpcs:ignore
 				if ( ! $create || empty( $create[1] ) ) {
 					// Table disappeared while exporting; skip it.
-					PB_Log::add( $job, sprintf( 'Table %s disappeared during export — skipped', $tb['name'] ), 'warn' );
+					Monarch_Log::add( $job, sprintf( 'Table %s disappeared during export — skipped', $tb['name'] ), 'warn' );
 					$st['ti']++;
 					continue;
 				}
 				$st['t_rows']  = 0;
 				$st['t_bytes'] = 0;
-				PB_Log::add(
+				Monarch_Log::add(
 					$job,
 					sprintf(
 						'[%d/%d] %s — structure saved, ~%s rows%s%s',
 						$st['ti'] + 1,
 						count( $st['tables'] ),
 						$tb['name'],
-						PB_Log::num( $tb['rows'] ),
+						Monarch_Log::num( $tb['rows'] ),
 						$tb['keyset'] ? ' (fast primary-key paging)' : ( $tb['pk'] ? ' (key paging)' : ' (no primary key, offset paging)' ),
 						$tb['where'] ? ' · filtered' : ''
 					)
@@ -198,7 +198,7 @@ class PB_DB_Dump {
 
 			$col_list = array();
 			foreach ( $tb['cols'] as $c ) {
-				$col_list[] = PB_Util::ident( $c['name'] );
+				$col_list[] = Monarch_Util::ident( $c['name'] );
 			}
 			$head  = self::MARKER . "\nINSERT INTO $token (" . implode( ',', $col_list ) . ") VALUES\n";
 			$buf   = '';
@@ -213,7 +213,7 @@ class PB_DB_Dump {
 					} elseif ( $c['binary'] ) {
 						$vals[] = '' === $v ? "''" : '0x' . $v;
 					} else {
-						$vals[] = "'" . PB_Util::esc_sql_value( $v ) . "'";
+						$vals[] = "'" . Monarch_Util::esc_sql_value( $v ) . "'";
 					}
 				}
 				$line = '(' . implode( ',', $vals ) . ')';
@@ -253,7 +253,7 @@ class PB_DB_Dump {
 		}
 		if ( $req_rows > 0 && 'rows' === $st['stage'] && isset( $st['tables'][ $st['ti'] ] ) ) {
 			$tb = $st['tables'][ $st['ti'] ];
-			PB_Log::add( $job, sprintf( '%s — %s / ~%s rows exported (batch size %s)', $req_table, PB_Log::num( $st['t_rows'] ), PB_Log::num( max( $tb['rows'], $st['t_rows'] ) ), PB_Log::num( $st['batch'] ) ) );
+			Monarch_Log::add( $job, sprintf( '%s — %s / ~%s rows exported (batch size %s)', $req_table, Monarch_Log::num( $st['t_rows'] ), Monarch_Log::num( max( $tb['rows'], $st['t_rows'] ) ), Monarch_Log::num( $st['batch'] ) ) );
 		}
 		fflush( $fh );
 		$st['sql_size'] = ftell( $fh );
@@ -270,7 +270,7 @@ class PB_DB_Dump {
 	private static function table_done( &$job, $tb ) {
 		$rows  = isset( $job['db']['t_rows'] ) ? $job['db']['t_rows'] : 0;
 		$bytes = isset( $job['db']['t_bytes'] ) ? $job['db']['t_bytes'] : 0;
-		PB_Log::add( $job, sprintf( '%s — done: %s rows (%s)', $tb['name'], PB_Log::num( $rows ), PB_Log::size( $bytes ) ), 'ok' );
+		Monarch_Log::add( $job, sprintf( '%s — done: %s rows (%s)', $tb['name'], Monarch_Log::num( $rows ), Monarch_Log::size( $bytes ) ), 'ok' );
 	}
 
 	/**
@@ -294,7 +294,7 @@ class PB_DB_Dump {
 		global $wpdb;
 		$select = array();
 		foreach ( $tb['cols'] as $c ) {
-			$select[] = $c['binary'] ? 'HEX(' . PB_Util::ident( $c['name'] ) . ')' : PB_Util::ident( $c['name'] );
+			$select[] = $c['binary'] ? 'HEX(' . Monarch_Util::ident( $c['name'] ) . ')' : Monarch_Util::ident( $c['name'] );
 		}
 		$limit            = (int) $st['batch'];
 		$st['used_batch'] = $limit;
@@ -302,17 +302,17 @@ class PB_DB_Dump {
 		if ( $tb['where'] ) {
 			$where[] = '(' . $tb['where'] . ')';
 		}
-		$sql = 'SELECT ' . implode( ',', $select ) . ' FROM ' . PB_Util::ident( $tb['name'] );
+		$sql = 'SELECT ' . implode( ',', $select ) . ' FROM ' . Monarch_Util::ident( $tb['name'] );
 		if ( $tb['keyset'] ) {
-			$pk = PB_Util::ident( $tb['pk'][0] );
+			$pk = Monarch_Util::ident( $tb['pk'][0] );
 			if ( null !== $st['last'] ) {
-				$where[] = $pk . " > '" . PB_Util::esc_sql_value( $st['last'] ) . "'";
+				$where[] = $pk . " > '" . Monarch_Util::esc_sql_value( $st['last'] ) . "'";
 			}
 			$sql .= ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' ) . " ORDER BY $pk ASC LIMIT $limit";
 		} else {
 			$order = '';
 			if ( $tb['pk'] ) {
-				$order = ' ORDER BY ' . implode( ',', array_map( array( 'PB_Util', 'ident' ), $tb['pk'] ) );
+				$order = ' ORDER BY ' . implode( ',', array_map( array( 'Monarch_Util', 'ident' ), $tb['pk'] ) );
 			}
 			$sql .= ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' ) . $order . ' LIMIT ' . (int) $st['offset'] . ', ' . $limit;
 		}

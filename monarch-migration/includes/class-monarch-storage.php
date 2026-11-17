@@ -2,7 +2,7 @@
 /**
  * Storage: protected folders, backups list, job state and locking.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,10 +12,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Filesystem storage helper.
  */
-class PB_Storage {
+class Monarch_Storage {
 
-	const OPTION_DIR      = 'probackup_storage_dir';
-	const OPTION_SETTINGS = 'probackup_settings';
+	const OPTION_DIR      = 'monarch_storage_dir';
+	const OPTION_SETTINGS = 'monarch_settings';
 
 	/**
 	 * Absolute path of the storage root (no trailing slash).
@@ -24,11 +24,43 @@ class PB_Storage {
 	 */
 	public static function root() {
 		$name = get_option( self::OPTION_DIR );
-		if ( ! $name || ! preg_match( '/^probackup-storage-[a-z0-9]{12}$/', $name ) ) {
-			$name = 'probackup-storage-' . strtolower( wp_generate_password( 12, false, false ) );
+		if ( ! $name ) {
+			$name = self::adopt_legacy();
+		}
+		if ( ! $name || ! preg_match( '/^monarch-storage-[a-z0-9]{12}$/', $name ) ) {
+			$name = 'monarch-storage-' . strtolower( wp_generate_password( 12, false, false ) );
 			update_option( self::OPTION_DIR, $name, false );
 		}
 		return untrailingslashit( WP_CONTENT_DIR ) . '/' . $name;
+	}
+
+	/**
+	 * Upgrade from the plugin's former name (ProBackup): take over its storage
+	 * folder, backups and settings so nothing is lost after switching.
+	 * The old options are removed, so uninstalling the old plugin cannot delete
+	 * the adopted backups.
+	 *
+	 * @return string New storage folder name, or '' if there is nothing to adopt.
+	 */
+	private static function adopt_legacy() {
+		$old = get_option( 'probackup_storage_dir' );
+		if ( ! is_string( $old ) || ! preg_match( '/^probackup-storage-([a-z0-9]{12})$/', $old, $m ) ) {
+			return '';
+		}
+		$content = untrailingslashit( WP_CONTENT_DIR );
+		$name    = 'monarch-storage-' . $m[1];
+		if ( is_dir( $content . '/' . $old ) && ! file_exists( $content . '/' . $name ) && ! @rename( $content . '/' . $old, $content . '/' . $name ) ) { // phpcs:ignore
+			return '';
+		}
+		update_option( self::OPTION_DIR, $name, false );
+		$settings = get_option( 'probackup_settings' );
+		if ( is_array( $settings ) && false === get_option( self::OPTION_SETTINGS ) ) {
+			update_option( self::OPTION_SETTINGS, $settings, false );
+		}
+		delete_option( 'probackup_storage_dir' );
+		delete_option( 'probackup_settings' );
+		delete_option( 'probackup_active_job' );
+		return $name;
 	}
 
 	/**
@@ -55,7 +87,7 @@ class PB_Storage {
 			wp_mkdir_p( $root );
 		}
 		$files = array(
-			'.htaccess'  => "# ProBackup\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder allow,deny\nDeny from all\n</IfModule>\nOptions -Indexes\n",
+			'.htaccess'  => "# Monarch\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder allow,deny\nDeny from all\n</IfModule>\nOptions -Indexes\n",
 			'index.php'  => "<?php\n// Silence is golden.\n",
 			'index.html' => '',
 			'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><authorization><deny users=\"*\" /></authorization></system.webServer></configuration>\n",
@@ -144,8 +176,8 @@ class PB_Storage {
 		foreach ( $list ? $list : array() as $file ) {
 			$out[] = array(
 				'name'  => basename( $file ),
-				'size'  => PB_Util::filesize( $file ),
-				'human' => size_format( PB_Util::filesize( $file ), 1 ),
+				'size'  => Monarch_Util::filesize( $file ),
+				'human' => size_format( Monarch_Util::filesize( $file ), 1 ),
 				'time'  => filemtime( $file ),
 				'date'  => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), filemtime( $file ) ),
 			);

@@ -2,7 +2,7 @@
 /**
  * Shared helpers: time/memory budget, SQL escaping, misc.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Utility functions.
  */
-class PB_Util {
+class Monarch_Util {
 
 	/**
 	 * Request start time.
@@ -47,7 +47,7 @@ class PB_Util {
 		 *
 		 * @param float $budget Seconds.
 		 */
-		self::$budget = max( 0.05, (float) apply_filters( 'probackup_time_budget', max( 2, (float) $budget ) ) );
+		self::$budget = max( 0.05, (float) apply_filters( 'monarch_time_budget', max( 2, (float) $budget ) ) );
 		@set_time_limit( max( 60, (int) ( $budget * 4 ) ) ); // phpcs:ignore
 		@ignore_user_abort( true ); // phpcs:ignore
 		if ( function_exists( 'wp_raise_memory_limit' ) ) {

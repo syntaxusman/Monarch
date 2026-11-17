@@ -1,10 +1,10 @@
-=== ProBackup – Site Migration ===
+=== Monarch – Site Migration ===
 Contributors: stratonally
 Tags: migration, backup, clone, move site, croc
 Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.3
+Stable tag: 1.1.0
 License: MIT
 License URI: https://opensource.org/licenses/MIT
 
@@ -12,7 +12,7 @@ Lightweight whole-site migration with a chunked, resumable database import that 
 
 == Description ==
 
-ProBackup moves a complete WordPress site (database, media, plugins, themes, must-use plugins and other wp-content folders) to another server.
+Monarch moves a complete WordPress site (database, media, plugins, themes, must-use plugins and other wp-content folders) to another server.
 
 **Built for big databases**
 
@@ -27,19 +27,19 @@ ProBackup moves a complete WordPress site (database, media, plugins, themes, mus
 
 [croc](https://github.com/schollz/croc) sends files end-to-end encrypted between two computers using a code phrase and a relay.
 
-1. On the source site: Export → Send with croc. ProBackup starts croc in the background and shows a code phrase.
+1. On the source site: Export → Send with croc. Monarch starts croc in the background and shows a code phrase.
 2. On the destination site: Import → Receive with croc → enter the code phrase.
 3. The package travels directly between the two servers, encrypted. The code phrase is passed through the CROC_SECRET environment variable, so it never appears in the process list.
 
-ProBackup downloads the official croc release from GitHub on first use and verifies its SHA-256 checksum. You can also point it at your own croc binary and use a private relay in Settings.
+Monarch downloads the official croc release from GitHub on first use and verifies its SHA-256 checksum. You can also point it at your own croc binary and use a private relay in Settings.
 
 Requirements for croc mode: PHP proc_open() enabled and outgoing TCP to the relay (ports 9009–9013 for the public relay). If your host blocks this, download the .pbk and upload it (chunked, resumable uploads of any size), or run croc on your own computer with the commands shown in the plugin.
 
 == Installation ==
 
-1. Upload the `probackup` folder to `/wp-content/plugins/` (or upload the zip in Plugins → Add New).
+1. Upload the `monarch-migration` folder to `/wp-content/plugins/` (or upload the zip in Plugins → Add New).
 2. Activate it on both the source and the destination site.
-3. Open ProBackup in the admin menu.
+3. Open Monarch in the admin menu.
 
 == Frequently Asked Questions ==
 
@@ -49,7 +49,7 @@ The username and password of the source site, because its users table was import
 
 = Where are backups stored? =
 
-In `wp-content/probackup-storage-<random>/backups/`, protected from web access.
+In `wp-content/monarch-storage-<random>/backups/`, protected from web access.
 
 = Is multisite supported? =
 
@@ -57,8 +57,13 @@ Not yet.
 
 == Changelog ==
 
+= 1.1.0 =
+* ProBackup is now Monarch – Site Migration: new name, logo, admin menu icon and plugin folder (monarch-migration).
+* Upgrading from ProBackup: Monarch takes over ProBackup's backups and settings automatically. Deactivate and delete ProBackup afterwards.
+* Existing .pbk packages remain fully compatible.
+
 = 1.0.3 =
-* ProBackup is now released under the MIT License (license.txt included in the plugin).
+* Monarch is now released under the MIT License (license.txt included in the plugin).
 * New README with full documentation, and a contributing guide.
 
 = 1.0.2 =

@@ -1,6 +1,8 @@
 <div align="center">
 
-# ProBackup – Site Migration
+<img src="branding/monarch-banner.png" alt="Monarch – Site Migration" width="100%">
+
+# Monarch – Site Migration
 
 **Move a complete WordPress site to another server, including large databases that other migration plugins fail to import.**
 
@@ -16,7 +18,7 @@
 
 ---
 
-ProBackup packages your database, media, plugins, themes and the rest of `wp-content` into one file and restores it on another WordPress site. The package can move between servers in three ways:
+Monarch packages your database, media, plugins, themes and the rest of `wp-content` into one file and restores it on another WordPress site. The package can move between servers in three ways:
 - sent directly with **[croc](https://github.com/schollz/croc)**, end-to-end encrypted with a one-time code phrase;
 - uploaded in resumable chunks;
 - downloaded and uploaded by hand.
@@ -43,6 +45,7 @@ It was built for the point where most migration tools break: **importing the dat
 - [Development](#development)
 - [Releases](#releases)
 - [Contributing](#contributing)
+- [Fun fact: the name and the logo](#fun-fact-the-name-and-the-logo)
 - [License](#license)
 
 ## Features
@@ -111,16 +114,18 @@ Cache folders and other backup plugins' archives are always skipped.
 
 If your host blocks either one, use upload or download instead. Every other feature works without them.
 
-ProBackup must be installed on **both** the source and the destination site.
+Monarch must be installed on **both** the source and the destination site.
 
 ## Installation
 
-1. Download **`probackup.zip`** from the [latest release](https://github.com/zubbicodes/ProBackup/releases/latest).
-   > Use the `probackup.zip` attachment, not GitHub's "Source code" archive, which also contains the test suite.
+1. Download **`monarch-migration.zip`** from the [latest release](https://github.com/zubbicodes/ProBackup/releases/latest).
+   > Use the `monarch-migration.zip` attachment, not GitHub's "Source code" archive, which also contains the test suite.
 2. In WordPress, go to **Plugins → Add New → Upload Plugin**, choose the zip and click **Install Now**.
-3. Click **Activate**. **ProBackup** appears in the admin menu.
+3. Click **Activate**. **Monarch** appears in the admin menu.
 
 To **update**, upload the new zip the same way and choose **Replace current with uploaded**. Your backups and settings are kept.
+
+> **Upgrading from ProBackup?** Monarch is the new name of ProBackup. Install and activate Monarch, then deactivate and delete ProBackup. Monarch takes over ProBackup's backups and settings automatically the first time it runs, and existing `.pbk` packages keep working.
 
 The destination can be a brand-new, empty WordPress installation. Its content is replaced during the import.
 
@@ -128,7 +133,7 @@ The destination can be a brand-new, empty WordPress installation. Its content is
 
 ### 1. Export the source site
 
-1. Open **ProBackup → Migrate → Export**.
+1. Open **Monarch → Migrate → Export**.
 2. Choose what to include. Your choices are remembered for next time.
 3. Click **Create package** and follow the live log. You can leave the tab open in the background.
 
@@ -139,10 +144,10 @@ When it finishes, you can **send it with croc** or **download** the `.pbk` file.
 **With croc (recommended)**
 
 1. On the source site, click **Send with croc**. A code phrase such as `4821-amber-tiger-ocean-maple` appears. You can also type your own.
-2. On the destination site, open **ProBackup → Migrate → Import → Receive with croc**, enter the code phrase and click **Receive**.
+2. On the destination site, open **Monarch → Migrate → Import → Receive with croc**, enter the code phrase and click **Receive**.
 3. Both sites show progress. The package travels directly between the servers, encrypted.
 
-The first time you use croc on a server, ProBackup offers to **install it**. This is a one-click download of the official release, verified against its SHA-256 checksum.
+The first time you use croc on a server, Monarch offers to **install it**. This is a one-click download of the official release, verified against its SHA-256 checksum.
 
 **With upload**
 
@@ -150,7 +155,7 @@ On the destination site, open **Import → Upload file** and drop the `.pbk` fil
 
 **Without croc on the server**
 
-If your host doesn't allow `proc_open()`, ProBackup shows you the croc commands to run on your own computer instead. For example:
+If your host doesn't allow `proc_open()`, Monarch shows you the croc commands to run on your own computer instead. For example:
 
 ```bash
 # receive on your computer
@@ -184,7 +189,7 @@ When it's done, **log in with the source site's username and password**, because
 
 **Kept on the destination**
 - This site's URL (`siteurl` / `home`), so the migrated site runs at its new address.
-- ProBackup itself stays installed and active.
+- Monarch itself stays installed and active.
 - The table prefix is converted automatically if the two sites use different prefixes.
 
 ### Handling errors
@@ -197,7 +202,7 @@ If a database statement fails after all automatic repairs, the import pauses and
   - **Skip statement and continue**;
   - **Cancel and roll back**, which drops the temporary tables and leaves your live site untouched.
 
-If you close the tab during a job, reopen ProBackup and click **Continue** to resume where it stopped.
+If you close the tab during a job, reopen Monarch and click **Continue** to resume where it stopped.
 
 ### Backups
 
@@ -246,16 +251,16 @@ Entries appear in this order: `package.json` (a manifest with source URLs, paths
 
 ## croc transfer in detail
 
-- **Version.** ProBackup uses croc **v11.6.5**. It picks the right build for the server's operating system and CPU (Linux, macOS, Windows, FreeBSD; x86-64, ARM64, ARM, 32-bit). It installs the binary only if its SHA-256 checksum matches the official checksums file.
+- **Version.** Monarch uses croc **v11.6.5**. It picks the right build for the server's operating system and CPU (Linux, macOS, Windows, FreeBSD; x86-64, ARM64, ARM, 32-bit). It installs the binary only if its SHA-256 checksum matches the official checksums file.
 - **Hidden code phrase.** croc runs in the background. The code phrase is passed in the `CROC_SECRET` environment variable, so it never appears in the server's process list.
-- **Progress.** ProBackup reads progress from croc's output and shows it live, including the raw croc output in the log.
+- **Progress.** Monarch reads progress from croc's output and shows it live, including the raw croc output in the log.
 - **Encryption.** Transfers are end-to-end encrypted (PAKE + AES-256). The relay only passes encrypted data along.
 - **Cancel.** You can cancel a transfer at any time; the background process is stopped.
 
 ## Security
 
 - **Admins only.** All actions require the `manage_options` capability and a valid nonce. Every AJAX sub-action is on a whitelist.
-- **Protected storage.** Backups are stored in `wp-content/probackup-storage-<random>/`. The folder has `.htaccess`, `web.config` and `index.php` protection, and files are only served through an authenticated download handler.
+- **Protected storage.** Backups are stored in `wp-content/monarch-storage-<random>/`. The folder has `.htaccess`, `web.config` and `index.php` protection, and files are only served through an authenticated download handler.
 - **Archive checks.** Paths inside archives are validated before extraction. Absolute paths and `..` are rejected.
 - **Shell safety.** Shell arguments are escaped, and code phrases are limited to letters, digits and dashes.
 - **Treat packages as sensitive.** A `.pbk` contains your whole database, including user password hashes. Store and share it accordingly.
@@ -303,7 +308,7 @@ Yes. Create a package, keep it (or download it), and use **Restore** from the Ba
 <details>
 <summary><strong>Is multisite supported?</strong></summary>
 
-Not yet. ProBackup currently migrates single sites.
+Not yet. Monarch currently migrates single sites.
 </details>
 
 <details>
@@ -316,7 +321,7 @@ No. Upload and download work on every host. croc is the faster and more convenie
 
 | Problem | Solution |
 |---------|----------|
-| WordPress says **"Incompatible Archive"** when installing | You uploaded the "Source code" zip or a damaged file. Download `probackup.zip` from the release assets. |
+| WordPress says **"Incompatible Archive"** when installing | You uploaded the "Source code" zip or a damaged file. Download `monarch-migration.zip` from the release assets. |
 | The admin page still shows an old design after updating | Hard-refresh (Ctrl+F5) and purge any page or CDN cache (LiteSpeed, Cloudflare and similar). |
 | "This host does not allow running programs" | `proc_open()` is disabled. Use upload/download, or run croc on your computer with the commands shown. |
 | croc waits forever for the other side | Check that both sites use the same code phrase and the same relay, and that outgoing ports 9009–9013 are open. |
@@ -328,28 +333,32 @@ No. Upload and download work on every host. croc is the faster and more convenie
 ## Development
 
 ```
-probackup/                  The plugin (this folder is what gets zipped)
-├── probackup.php           Bootstrap, constants, autoloader
-├── uninstall.php           Cleanup on plugin deletion
-├── readme.txt              WordPress.org readme and changelog
+monarch-migration/                  The plugin (this folder is what gets zipped)
+├── monarch-migration.php           Bootstrap, constants, autoloader
+├── uninstall.php                   Cleanup on plugin deletion
+├── readme.txt                      WordPress.org readme and changelog
 ├── license.txt
 ├── assets/
-│   ├── admin.css           Admin UI styles (WordPress-native)
-│   └── admin.js            Admin single-page app (vanilla JS)
+│   ├── admin.css                   Admin UI styles (WordPress-native)
+│   ├── admin.js                    Admin single-page app (vanilla JS)
+│   ├── menu-icon.svg               Single-color admin menu icon
+│   └── monarch-icon.png            Logo shown in the admin header
 └── includes/
-    ├── class-pb-plugin.php     Admin page, AJAX router, download handler
-    ├── class-pb-storage.php    Protected storage, job state, locks, settings
-    ├── class-pb-archive.php    .pbk reader / writer
-    ├── class-pb-export.php     Export step machine
-    ├── class-pb-db-dump.php    Chunked SQL dump
-    ├── class-pb-import.php     Import step machine and table swap
-    ├── class-pb-db-import.php  Statement-by-statement SQL import and repairs
-    ├── class-pb-replace.php    Serialization-safe search and replace
-    ├── class-pb-croc.php       croc install, send, receive, progress
-    ├── class-pb-log.php        Live activity log
-    └── class-pb-util.php       Timers, escaping, helpers
-test/                       Docker end-to-end test suite
-.github/workflows/          Lint and automatic releases
+    ├── class-monarch-plugin.php    Admin page, AJAX router, download handler
+    ├── class-monarch-storage.php   Protected storage, job state, locks, settings
+    ├── class-monarch-archive.php   .pbk reader / writer
+    ├── class-monarch-export.php    Export step machine
+    ├── class-monarch-db-dump.php   Chunked SQL dump
+    ├── class-monarch-import.php    Import step machine and table swap
+    ├── class-monarch-db-import.php Statement-by-statement SQL import and repairs
+    ├── class-monarch-replace.php   Serialization-safe search and replace
+    ├── class-monarch-croc.php      croc install, send, receive, progress
+    ├── class-monarch-log.php       Live activity log
+    └── class-monarch-util.php      Timers, escaping, helpers
+test/                               Docker end-to-end test suite
+branding/                           Logo, icon sizes, wordmark, README banner
+.wordpress-org/                     Plugin directory icons and banners
+.github/workflows/                  Lint and automatic releases
 ```
 
 To run the full test (requires Docker, Node.js and Bash):
@@ -363,14 +372,14 @@ docker compose down -v
 
 The test migrates a deliberately difficult site from MySQL 8 / PHP 7.4 to MariaDB 10.4 / PHP 8.3, with a 256 KB packet limit and a different table prefix. It forces a resume on every request and checks the result with 22 assertions. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-**Hook:** `probackup_time_budget` (float, seconds) filters the time each request may work.
+**Hook:** `monarch_time_budget` (float, seconds) filters the time each request may work.
 
 ## Releases
 
 Releases are automatic. When a push to `main` changes the plugin version, the [Release workflow](.github/workflows/release.yml) does the following:
 - lints the code;
-- builds `probackup.zip`;
-- publishes a GitHub release, using the matching changelog entry from `probackup/readme.txt` as the release notes.
+- builds `monarch-migration.zip`;
+- publishes a GitHub release, using the matching changelog entry from `monarch-migration/readme.txt` as the release notes.
 
 See [all releases](https://github.com/zubbicodes/ProBackup/releases).
 
@@ -378,10 +387,29 @@ See [all releases](https://github.com/zubbicodes/ProBackup/releases).
 
 Bug reports, ideas and pull requests are welcome. Please read **[CONTRIBUTING.md](CONTRIBUTING.md)** first.
 
+## Fun fact: the name and the logo
+
+<img src="branding/monarch-icon-128.png" alt="Monarch logo" width="96" align="right">
+
+**Why "Monarch"?** The monarch butterfly makes one of the most remarkable migrations in nature. Every autumn, millions of monarchs fly up to about 4,000 km (2,500 miles) from Canada and the northern United States to the same forests in central Mexico, a place none of them has ever seen. No single butterfly makes the whole round trip. The journey is spread across several generations, each carrying it a step further until the whole population arrives.
+
+That is how this plugin moves a website. It doesn't try to carry everything in one huge request that times out halfway. It travels in small, steady steps, each one saving its position and handing over to the next, until the whole site arrives safely at its new home.
+
+**What the logo means**
+
+| Part of the logo | What it stands for |
+|------------------|--------------------|
+| The monarch butterfly | Migration: moving your whole site to a new home |
+| The left wing, shaped like a **database cylinder** | The database, the part other migration tools fail on and the reason Monarch exists |
+| The right wing, **breaking into small squares** | Your data travelling in small chunks and being put back together at the other end |
+| The orange and black | The real monarch's colors |
+
+The logo was generated with [Antigravity](https://antigravity.google), and the icon, banners and wordmark were built from it. All brand files are in [`branding/`](branding).
+
 ## Credits
 
-- [croc](https://github.com/schollz/croc) by Zack Scholl (MIT), used for encrypted transfers. ProBackup downloads it from its official releases; it is not bundled.
+- [croc](https://github.com/schollz/croc) by Zack Scholl (MIT), used for encrypted transfers. Monarch downloads it from its official releases; it is not bundled.
 
 ## License
 
-ProBackup is released under the [MIT License](LICENSE). © 2026 StratonAlly.
+Monarch is released under the [MIT License](LICENSE). © 2026 StratonAlly.

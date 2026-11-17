@@ -64,7 +64,7 @@ if [[ "$MODE" == "croc" ]]; then
     st=$(echo "$p" | j 'd.data.state')
     echo "  receive: $st $(echo "$p" | j 'd.data.percent')% $(echo "$p" | j 'd.data.message')"
     [[ "$st" == "done" ]] && { NAME=$(echo "$p" | j 'd.data.file'); break; }
-    [[ "$st" == "error" ]] && { docker compose exec -T dst sh -c 'cat /var/www/html/wp-content/probackup-storage-*/croc/*.log' || true; exit 1; }
+    [[ "$st" == "error" ]] && { docker compose exec -T dst sh -c 'cat /var/www/html/wp-content/monarch-storage-*/croc/*.log' || true; exit 1; }
     sleep 3
   done
   echo "  sender: $(curl -s "$SRC/runner.php?sub=croc_poll&id=$(echo "$send" | j 'd.data.id')")"
@@ -114,7 +114,7 @@ const checks = {
   'admin password from source': d.admin_hash === s.admin_hash,
   'capabilities re-prefixed': d.caps_key >= 1,
   'user_roles re-prefixed': d.roles,
-  'ProBackup still active': (d.active || []).includes('probackup/probackup.php'),
+  'Monarch still active': (d.active || []).includes('monarch-migration/monarch-migration.php'),
   '5 MB file identical': !!d.big_file_md5 && d.big_file_md5 === s.big_file_md5,
   '200 small files': d.small_files === 200,
   'other wp-content dirs': d.lang,

@@ -7,7 +7,7 @@
  * - Auto-repairs common cross-server problems (collations, utf8mb4, key length,
  *   storage engines, max_allowed_packet, duplicate keys, lost connections).
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Database importer.
  */
-class PB_DB_Import {
+class Monarch_DB_Import {
 
 	/**
 	 * Prepare server capabilities once per job.
@@ -45,11 +45,11 @@ class PB_DB_Import {
 	 * @param array $caps Caps.
 	 */
 	public static function session( $caps ) {
-		PB_Util::raw_query( "SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'" );
-		PB_Util::raw_query( 'SET FOREIGN_KEY_CHECKS = 0' );
-		PB_Util::raw_query( 'SET UNIQUE_CHECKS = 0' );
-		PB_Util::raw_query( $caps['utf8mb4'] ? 'SET NAMES utf8mb4' : 'SET NAMES utf8' );
-		PB_Util::raw_query( 'SET SESSION wait_timeout = 600' );
+		Monarch_Util::raw_query( "SET SESSION sql_mode = 'NO_AUTO_VALUE_ON_ZERO'" );
+		Monarch_Util::raw_query( 'SET FOREIGN_KEY_CHECKS = 0' );
+		Monarch_Util::raw_query( 'SET UNIQUE_CHECKS = 0' );
+		Monarch_Util::raw_query( $caps['utf8mb4'] ? 'SET NAMES utf8mb4' : 'SET NAMES utf8' );
+		Monarch_Util::raw_query( 'SET SESSION wait_timeout = 600' );
 	}
 
 	/**
@@ -74,7 +74,7 @@ class PB_DB_Import {
 				self::table_finished( $job );
 				break;
 			}
-			if ( PB_Util::out_of_time() ) {
+			if ( Monarch_Util::out_of_time() ) {
 				break;
 			}
 			list( $sql, $next ) = self::read_statement( $fh, $st['pos'], $st['end'] );
@@ -87,13 +87,13 @@ class PB_DB_Import {
 				$st['pos']   = $next;
 				$st['index']++;
 				$job['skipped'][] = $st['index'];
-				PB_Log::add( $job, sprintf( 'Skipped statement #%d at your request', $st['index'] ), 'warn' );
+				Monarch_Log::add( $job, sprintf( 'Skipped statement #%d at your request', $st['index'] ), 'warn' );
 				continue;
 			}
 			self::track( $sql, $job );
 			$err = self::execute( $sql, $job );
 			if ( true !== $err ) {
-				PB_Log::add( $job, sprintf( 'Statement #%d failed: %s', $st['index'] + 1, $err ), 'err' );
+				Monarch_Log::add( $job, sprintf( 'Statement #%d failed: %s', $st['index'] + 1, $err ), 'err' );
 				$job['error'] = array(
 					'stage'     => 'db',
 					'statement' => $st['index'] + 1,
@@ -114,7 +114,7 @@ class PB_DB_Import {
 			}
 		}
 		if ( 'more' === $result && $st['req_rows'] > 0 && ! empty( $st['cur'] ) ) {
-			PB_Log::add( $job, sprintf( '%s — %s rows imported so far · statement %s of %s', $st['cur'], PB_Log::num( $st['cur_rows'] ), PB_Log::num( $st['index'] ), PB_Log::num( $st['total'] ) ) );
+			Monarch_Log::add( $job, sprintf( '%s — %s rows imported so far · statement %s of %s', $st['cur'], Monarch_Log::num( $st['cur_rows'] ), Monarch_Log::num( $st['index'] ), Monarch_Log::num( $st['total'] ) ) );
 		}
 		return $result;
 	}
@@ -126,7 +126,7 @@ class PB_DB_Import {
 	 * @param array  $job Job.
 	 */
 	private static function track( $sql, &$job ) {
-		if ( ! preg_match( '/^\s*CREATE TABLE `' . preg_quote( PB_DB_Dump::PREFIX_TOKEN, '/' ) . '([^`]+)`/', $sql, $m ) ) {
+		if ( ! preg_match( '/^\s*CREATE TABLE `' . preg_quote( Monarch_DB_Dump::PREFIX_TOKEN, '/' ) . '([^`]+)`/', $sql, $m ) ) {
 			return;
 		}
 		self::table_finished( $job );
@@ -136,7 +136,7 @@ class PB_DB_Import {
 		$st['cur_bytes']   = 0;
 		$st['tables_done'] = ( isset( $st['tables_done'] ) ? $st['tables_done'] : 0 ) + 1;
 		$total             = isset( $job['manifest']['tables'] ) ? count( $job['manifest']['tables'] ) : 0;
-		PB_Log::add( $job, sprintf( '[%d/%d] Creating table %s', $st['tables_done'], $total, $job['live'] . $m[1] ) );
+		Monarch_Log::add( $job, sprintf( '[%d/%d] Creating table %s', $st['tables_done'], $total, $job['live'] . $m[1] ) );
 	}
 
 	/**
@@ -149,7 +149,7 @@ class PB_DB_Import {
 		if ( empty( $st['cur'] ) ) {
 			return;
 		}
-		PB_Log::add( $job, sprintf( '%s — done: %s rows (%s of SQL)', $job['live'] . $st['cur'], PB_Log::num( isset( $st['cur_rows'] ) ? $st['cur_rows'] : 0 ), PB_Log::size( isset( $st['cur_bytes'] ) ? $st['cur_bytes'] : 0 ) ), 'ok' );
+		Monarch_Log::add( $job, sprintf( '%s — done: %s rows (%s of SQL)', $job['live'] . $st['cur'], Monarch_Log::num( isset( $st['cur_rows'] ) ? $st['cur_rows'] : 0 ), Monarch_Log::size( isset( $st['cur_bytes'] ) ? $st['cur_bytes'] : 0 ) ), 'ok' );
 		$st['cur'] = '';
 	}
 
@@ -174,7 +174,7 @@ class PB_DB_Import {
 			if ( $line_pos + strlen( $line ) > $end ) {
 				$line = substr( $line, 0, $end - $line_pos );
 			}
-			if ( 0 === strpos( $line, PB_DB_Dump::MARKER ) && rtrim( $line ) === PB_DB_Dump::MARKER ) {
+			if ( 0 === strpos( $line, Monarch_DB_Dump::MARKER ) && rtrim( $line ) === Monarch_DB_Dump::MARKER ) {
 				if ( $first ) {
 					$first = false;
 					continue;
@@ -202,9 +202,9 @@ class PB_DB_Import {
 		if ( 'INSERT' === $type ) {
 			$head_len = strpos( $sql, ' VALUES' );
 			$head_len = false === $head_len ? 200 : $head_len;
-			$sql      = str_replace( PB_DB_Dump::PREFIX_TOKEN, $tmp, substr( $sql, 0, $head_len ) ) . substr( $sql, $head_len );
+			$sql      = str_replace( Monarch_DB_Dump::PREFIX_TOKEN, $tmp, substr( $sql, 0, $head_len ) ) . substr( $sql, $head_len );
 		} else {
-			$sql = str_replace( PB_DB_Dump::PREFIX_TOKEN, $tmp, $sql );
+			$sql = str_replace( Monarch_DB_Dump::PREFIX_TOKEN, $tmp, $sql );
 		}
 		if ( 'CREATE' === $type ) {
 			$notes = array();
@@ -214,9 +214,9 @@ class PB_DB_Import {
 				$kind = substr( $note, strpos( $note, ': ' ) + 2 );
 				if ( empty( $job['db']['seen'][ md5( $kind ) ] ) ) {
 					$job['db']['seen'][ md5( $kind ) ] = 1;
-					PB_Log::add( $job, 'Compatibility fix: ' . $note, 'warn' );
+					Monarch_Log::add( $job, 'Compatibility fix: ' . $note, 'warn' );
 				} else {
-					PB_Log::add( $job, 'Compatibility fix applied to ' . strtok( $note, ':' ) . ' (same as above)', 'warn' );
+					Monarch_Log::add( $job, 'Compatibility fix applied to ' . strtok( $note, ':' ) . ' (same as above)', 'warn' );
 				}
 			}
 		}
@@ -227,7 +227,7 @@ class PB_DB_Import {
 			if ( count( $parts ) < 2 ) {
 				return self::too_big( $sql, $job );
 			}
-			PB_Log::add( $job, sprintf( 'INSERT of %s is larger than this server\'s max_allowed_packet (%s) — split into %d smaller queries', PB_Log::size( strlen( $sql ) ), PB_Log::size( $job['caps']['packet'] ), count( $parts ) ), 'warn' );
+			Monarch_Log::add( $job, sprintf( 'INSERT of %s is larger than this server\'s max_allowed_packet (%s) — split into %d smaller queries', Monarch_Log::size( strlen( $sql ) ), Monarch_Log::size( $job['caps']['packet'] ), count( $parts ) ), 'warn' );
 			foreach ( $parts as $part ) {
 				$r = self::run( $part, $job, 'INSERT' );
 				if ( true !== $r ) {
@@ -250,7 +250,7 @@ class PB_DB_Import {
 	private static function run( $sql, &$job, $type ) {
 		global $wpdb;
 		for ( $attempt = 0; $attempt < 4; $attempt++ ) {
-			list( $ok, $error, $errno ) = PB_Util::raw_query( $sql );
+			list( $ok, $error, $errno ) = Monarch_Util::raw_query( $sql );
 			if ( $ok ) {
 				return true;
 			}
@@ -262,7 +262,7 @@ class PB_DB_Import {
 				}
 				self::session( $job['caps'] );
 				$job['budget'] = max( 3, (int) ( $job['budget'] * 0.7 ) );
-				PB_Log::add( $job, sprintf( 'Database connection lost (%s) — reconnected and retrying; step time reduced to %ss', $error, $job['budget'] ), 'warn' );
+				Monarch_Log::add( $job, sprintf( 'Database connection lost (%s) — reconnected and retrying; step time reduced to %ss', $error, $job['budget'] ), 'warn' );
 				if ( 'INSERT' === $type && strlen( $sql ) > 65536 ) {
 					$parts = self::split_insert( $sql, (int) max( 16384, strlen( $sql ) / 4 ) );
 					if ( count( $parts ) > 1 ) {
@@ -279,7 +279,7 @@ class PB_DB_Import {
 			}
 			if ( 'INSERT' === $type && ( 1062 === $errno || false !== strpos( $lower, 'duplicate entry' ) ) && 0 !== stripos( $sql, 'INSERT IGNORE' ) ) {
 				$sql = preg_replace( '/^INSERT INTO/i', 'INSERT IGNORE INTO', ltrim( $sql ) );
-				PB_Log::add( $job, 'Duplicate key (' . $error . ') — rows already present, continuing with INSERT IGNORE', 'warn' );
+				Monarch_Log::add( $job, 'Duplicate key (' . $error . ') — rows already present, continuing with INSERT IGNORE', 'warn' );
 				continue;
 			}
 			if ( 'INSERT' === $type && ( 1153 === $errno || false !== strpos( $lower, 'max_allowed_packet' ) ) && strlen( $sql ) > 16384 ) {
@@ -287,7 +287,7 @@ class PB_DB_Import {
 				if ( count( $parts ) < 2 ) {
 					return self::too_big( $sql, $job );
 				}
-				PB_Log::add( $job, sprintf( 'Server rejected a %s query (max_allowed_packet) — retrying as %d smaller queries', PB_Log::size( strlen( $sql ) ), count( $parts ) ), 'warn' );
+				Monarch_Log::add( $job, sprintf( 'Server rejected a %s query (max_allowed_packet) — retrying as %d smaller queries', Monarch_Log::size( strlen( $sql ) ), count( $parts ) ), 'warn' );
 				foreach ( $parts as $part ) {
 					$r = self::run( $part, $job, 'INSERT' );
 					if ( true !== $r ) {
@@ -301,8 +301,8 @@ class PB_DB_Import {
 				$why   = '';
 				if ( ( 1050 === $errno || false !== strpos( $lower, 'already exists' ) ) && preg_match( '/^CREATE TABLE\s+(`[^`]+`)/i', ltrim( $sql ), $tm ) ) {
 					// A previous request was killed after CREATE but before saving progress.
-					PB_Util::raw_query( 'DROP TABLE IF EXISTS ' . $tm[1] );
-					PB_Log::add( $job, 'Table ' . $tm[1] . ' existed from an interrupted step — recreated it', 'warn' );
+					Monarch_Util::raw_query( 'DROP TABLE IF EXISTS ' . $tm[1] );
+					Monarch_Log::add( $job, 'Table ' . $tm[1] . ' existed from an interrupted step — recreated it', 'warn' );
 					continue;
 				}
 				if ( 1273 === $errno || false !== strpos( $lower, 'unknown collation' ) || false !== strpos( $lower, 'unknown character set' ) ) {
@@ -320,14 +320,14 @@ class PB_DB_Import {
 					$why   = 'zero-date defaults not allowed → DEFAULT NULL';
 				}
 				if ( $fixed !== $sql ) {
-					PB_Log::add( $job, sprintf( 'Server said "%s" — %s, retrying', $error, $why ), 'warn' );
+					Monarch_Log::add( $job, sprintf( 'Server said "%s" — %s, retrying', $error, $why ), 'warn' );
 					$sql = $fixed;
 					continue;
 				}
 			}
-			return $error ? $error : __( 'Unknown database error.', 'probackup' );
+			return $error ? $error : __( 'Unknown database error.', 'monarch-migration' );
 		}
-		return isset( $error ) && $error ? $error : __( 'Unknown database error.', 'probackup' );
+		return isset( $error ) && $error ? $error : __( 'Unknown database error.', 'monarch-migration' );
 	}
 
 	/**
@@ -423,7 +423,7 @@ class PB_DB_Import {
 	private static function too_big( $sql, $job ) {
 		return sprintf(
 			/* translators: 1: row size, 2: server limit */
-			__( 'A single database row is %1$s, but this MySQL server only accepts %2$s per query (max_allowed_packet). Ask your host to raise max_allowed_packet to at least 64M and click Retry — or Skip this row.', 'probackup' ),
+			__( 'A single database row is %1$s, but this MySQL server only accepts %2$s per query (max_allowed_packet). Ask your host to raise max_allowed_packet to at least 64M and click Retry — or Skip this row.', 'monarch-migration' ),
 			size_format( strlen( $sql ), 1 ),
 			size_format( $job['caps']['packet'], 0 )
 		);

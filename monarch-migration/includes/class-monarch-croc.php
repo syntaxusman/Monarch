@@ -3,12 +3,12 @@
  * croc integration (https://github.com/schollz/croc).
  *
  * croc sends files end-to-end encrypted (PAKE) between two computers through a
- * relay, using a shared code phrase. ProBackup runs croc in the background on
+ * relay, using a shared code phrase. Monarch runs croc in the background on
  * the server: the source site "sends" the .pbk, the destination "receives" it.
  * The code phrase is passed through the CROC_SECRET environment variable, so it
  * never appears in the process list.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * croc runner.
  */
-class PB_Croc {
+class Monarch_Croc {
 
 	const VERSION = '11.6.5';
 
@@ -68,7 +68,7 @@ class PB_Croc {
 	 * @return bool
 	 */
 	public static function can_exec() {
-		return PB_Util::fn_enabled( 'proc_open' );
+		return Monarch_Util::fn_enabled( 'proc_open' );
 	}
 
 	/**
@@ -113,11 +113,11 @@ class PB_Croc {
 	 * @return string|false
 	 */
 	public static function binary() {
-		$custom = PB_Storage::settings()['croc_path'];
+		$custom = Monarch_Storage::settings()['croc_path'];
 		if ( $custom && is_file( $custom ) ) {
 			return $custom;
 		}
-		$own = PB_Storage::dir( 'bin' ) . '/' . ( self::is_windows() ? 'croc.exe' : 'croc' );
+		$own = Monarch_Storage::dir( 'bin' ) . '/' . ( self::is_windows() ? 'croc.exe' : 'croc' );
 		return is_file( $own ) ? $own : false;
 	}
 
@@ -176,13 +176,13 @@ class PB_Croc {
 	public static function install() {
 		$asset = self::asset();
 		if ( ! $asset ) {
-			return new WP_Error( 'pb_croc_os', __( 'No croc build is available for this server (unknown OS/CPU). Set a custom croc path in Settings.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_os', __( 'No croc build is available for this server (unknown OS/CPU). Set a custom croc path in Settings.', 'monarch-migration' ) );
 		}
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		$base = 'https://github.com/schollz/croc/releases/download/v' . self::VERSION . '/';
 		$sums = wp_remote_get( $base . 'croc_v' . self::VERSION . '_checksums.txt', array( 'timeout' => 30 ) );
 		if ( is_wp_error( $sums ) || 200 !== wp_remote_retrieve_response_code( $sums ) ) {
-			return new WP_Error( 'pb_croc_dl', __( 'Could not reach GitHub to download croc. Your host may block outgoing connections.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_dl', __( 'Could not reach GitHub to download croc. Your host may block outgoing connections.', 'monarch-migration' ) );
 		}
 		$expected = '';
 		foreach ( preg_split( '/\r?\n/', wp_remote_retrieve_body( $sums ) ) as $line ) {
@@ -191,7 +191,7 @@ class PB_Croc {
 			}
 		}
 		if ( ! $expected ) {
-			return new WP_Error( 'pb_croc_sum', __( 'Checksum for croc not found; refusing to install.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_sum', __( 'Checksum for croc not found; refusing to install.', 'monarch-migration' ) );
 		}
 		$tmp = download_url( $base . $asset, 300 );
 		if ( is_wp_error( $tmp ) ) {
@@ -199,11 +199,11 @@ class PB_Croc {
 		}
 		if ( ! hash_equals( $expected, hash_file( 'sha256', $tmp ) ) ) {
 			@unlink( $tmp ); // phpcs:ignore
-			return new WP_Error( 'pb_croc_sum', __( 'croc download failed the SHA-256 check; it was deleted.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_sum', __( 'croc download failed the SHA-256 check; it was deleted.', 'monarch-migration' ) );
 		}
-		$bin_dir = PB_Storage::dir( 'bin' );
+		$bin_dir = Monarch_Storage::dir( 'bin' );
 		$name    = self::is_windows() ? 'croc.exe' : 'croc';
-		$work    = $bin_dir . '/extract-' . PB_Util::rand_id( 6 );
+		$work    = $bin_dir . '/extract-' . Monarch_Util::rand_id( 6 );
 		wp_mkdir_p( $work );
 		$ok = false;
 		try {
@@ -233,12 +233,12 @@ class PB_Croc {
 		}
 		@unlink( $tmp ); // phpcs:ignore
 		if ( ! $ok || ! is_file( $work . '/' . $name ) ) {
-			PB_Storage::rrmdir( $work );
-			return new WP_Error( 'pb_croc_extract', __( 'Could not extract croc (needs the Phar or Zip PHP extension).', 'probackup' ) );
+			Monarch_Storage::rrmdir( $work );
+			return new WP_Error( 'pb_croc_extract', __( 'Could not extract croc (needs the Phar or Zip PHP extension).', 'monarch-migration' ) );
 		}
 		rename( $work . '/' . $name, $bin_dir . '/' . $name ); // phpcs:ignore
 		@chmod( $bin_dir . '/' . $name, 0755 ); // phpcs:ignore
-		PB_Storage::rrmdir( $work );
+		Monarch_Storage::rrmdir( $work );
 		return true;
 	}
 
@@ -249,7 +249,7 @@ class PB_Croc {
 	 * @return string
 	 */
 	private static function session_file( $sid ) {
-		return PB_Storage::dir( 'croc' ) . '/' . preg_replace( '/[^a-z0-9]/', '', $sid ) . '.json';
+		return Monarch_Storage::dir( 'croc' ) . '/' . preg_replace( '/[^a-z0-9]/', '', $sid ) . '.json';
 	}
 
 	/**
@@ -282,7 +282,7 @@ class PB_Croc {
 	 * @return string
 	 */
 	private static function global_flags() {
-		$s     = PB_Storage::settings();
+		$s     = Monarch_Storage::settings();
 		$flags = ' --yes --ignore-stdin';
 		if ( $s['croc_relay'] ) {
 			$flags .= ' --relay ' . escapeshellarg( $s['croc_relay'] );
@@ -305,12 +305,12 @@ class PB_Croc {
 	private static function spawn( $args, $code, $log, $cwd ) {
 		$bin = self::binary();
 		if ( ! $bin ) {
-			return new WP_Error( 'pb_croc_missing', __( 'croc is not installed yet.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_missing', __( 'croc is not installed yet.', 'monarch-migration' ) );
 		}
 		if ( ! self::can_exec() ) {
-			return new WP_Error( 'pb_croc_exec', __( 'Your host disabled proc_open(), so croc cannot run on this server. Use the manual command or the upload option instead.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_exec', __( 'Your host disabled proc_open(), so croc cannot run on this server. Use the manual command or the upload option instead.', 'monarch-migration' ) );
 		}
-		$config = PB_Storage::dir( 'croc' ) . '/config';
+		$config = Monarch_Storage::dir( 'croc' ) . '/config';
 		wp_mkdir_p( $config );
 		$env = array(
 			'CROC_SECRET'     => $code,
@@ -328,7 +328,7 @@ class PB_Croc {
 		}
 		$p = @proc_open( $cmd, array( 0 => array( 'pipe', 'r' ), 1 => array( 'pipe', 'w' ), 2 => array( 'pipe', 'w' ) ), $pipes, $cwd, $env ); // phpcs:ignore
 		if ( ! is_resource( $p ) ) {
-			return new WP_Error( 'pb_croc_start', __( 'Could not start croc.', 'probackup' ) );
+			return new WP_Error( 'pb_croc_start', __( 'Could not start croc.', 'monarch-migration' ) );
 		}
 		fclose( $pipes[0] ); // phpcs:ignore
 		$out = stream_get_contents( $pipes[1] );
@@ -346,16 +346,16 @@ class PB_Croc {
 	 * @return array|WP_Error Session.
 	 */
 	public static function send( $name, $code = '' ) {
-		$path = PB_Storage::backup_path( $name );
+		$path = Monarch_Storage::backup_path( $name );
 		if ( ! $path || ! is_file( $path ) ) {
-			return new WP_Error( 'pb_nofile', __( 'Backup not found.', 'probackup' ) );
+			return new WP_Error( 'pb_nofile', __( 'Backup not found.', 'monarch-migration' ) );
 		}
 		$code = $code ? self::valid_code( $code ) : self::code();
 		if ( ! $code ) {
-			return new WP_Error( 'pb_code', __( 'The code phrase may only contain letters, numbers and dashes (6–64 characters).', 'probackup' ) );
+			return new WP_Error( 'pb_code', __( 'The code phrase may only contain letters, numbers and dashes (6–64 characters).', 'monarch-migration' ) );
 		}
-		$sid = PB_Util::rand_id( 12 );
-		$log = PB_Storage::dir( 'croc' ) . '/' . $sid . '.log';
+		$sid = Monarch_Util::rand_id( 12 );
+		$log = Monarch_Storage::dir( 'croc' ) . '/' . $sid . '.log';
 		$pid = self::spawn( trim( self::global_flags() ) . ' send ' . escapeshellarg( basename( $path ) ), $code, $log, dirname( $path ) );
 		if ( is_wp_error( $pid ) ) {
 			return $pid;
@@ -367,7 +367,7 @@ class PB_Croc {
 			'log'     => $log,
 			'code'    => $code,
 			'file'    => basename( $path ),
-			'size'    => PB_Util::filesize( $path ),
+			'size'    => Monarch_Util::filesize( $path ),
 			'started' => time(),
 		);
 		self::save( $s );
@@ -383,12 +383,12 @@ class PB_Croc {
 	public static function receive( $code ) {
 		$code = self::valid_code( $code );
 		if ( ! $code ) {
-			return new WP_Error( 'pb_code', __( 'Please enter a valid code phrase.', 'probackup' ) );
+			return new WP_Error( 'pb_code', __( 'Please enter a valid code phrase.', 'monarch-migration' ) );
 		}
-		$sid = PB_Util::rand_id( 12 );
-		$out = PB_Storage::dir( 'incoming' ) . '/croc-' . $sid;
+		$sid = Monarch_Util::rand_id( 12 );
+		$out = Monarch_Storage::dir( 'incoming' ) . '/croc-' . $sid;
 		wp_mkdir_p( $out );
-		$log = PB_Storage::dir( 'croc' ) . '/' . $sid . '.log';
+		$log = Monarch_Storage::dir( 'croc' ) . '/' . $sid . '.log';
 		$pid = self::spawn( trim( self::global_flags() ) . ' --overwrite --out ' . escapeshellarg( $out ), $code, $log, $out );
 		if ( is_wp_error( $pid ) ) {
 			return $pid;
@@ -433,9 +433,9 @@ class PB_Croc {
 	public static function poll( $sid ) {
 		$s = self::load( $sid );
 		if ( ! $s ) {
-			return new WP_Error( 'pb_sess', __( 'Transfer session not found.', 'probackup' ) );
+			return new WP_Error( 'pb_sess', __( 'Transfer session not found.', 'monarch-migration' ) );
 		}
-		$log   = is_file( $s['log'] ) ? (string) file_get_contents( $s['log'], false, null, max( 0, PB_Util::filesize( $s['log'] ) - 8192 ) ) : ''; // phpcs:ignore
+		$log   = is_file( $s['log'] ) ? (string) file_get_contents( $s['log'], false, null, max( 0, Monarch_Util::filesize( $s['log'] ) - 8192 ) ) : ''; // phpcs:ignore
 		$log   = str_replace( "\r", "\n", $log );
 		$log   = preg_replace( '/\x1b\[[0-9;]*[A-Za-z]/', '', $log );
 		$pct   = 0;
@@ -454,19 +454,19 @@ class PB_Croc {
 			$found = glob( $s['out'] . '/*.pbk' );
 			if ( $found && ( false === $alive || $pct >= 100 ) ) {
 				$src  = $found[0];
-				$name = PB_Storage::valid_name( basename( $src ) );
+				$name = Monarch_Storage::valid_name( basename( $src ) );
 				if ( ! $name ) {
 					$name = 'received-' . gmdate( 'Ymd-His' ) . '.pbk';
 				}
-				$dest = PB_Storage::dir( 'backups' ) . '/' . $name;
+				$dest = Monarch_Storage::dir( 'backups' ) . '/' . $name;
 				if ( file_exists( $dest ) ) {
-					$name = preg_replace( '/\.pbk$/', '', $name ) . '-' . PB_Util::rand_id( 4 ) . '.pbk';
-					$dest = PB_Storage::dir( 'backups' ) . '/' . $name;
+					$name = preg_replace( '/\.pbk$/', '', $name ) . '-' . Monarch_Util::rand_id( 4 ) . '.pbk';
+					$dest = Monarch_Storage::dir( 'backups' ) . '/' . $name;
 				}
-				$check = PB_Archive::validate( $src );
+				$check = Monarch_Archive::validate( $src );
 				if ( ! is_wp_error( $check ) ) {
 					rename( $src, $dest ); // phpcs:ignore
-					PB_Storage::rrmdir( $s['out'] );
+					Monarch_Storage::rrmdir( $s['out'] );
 					$state = 'done';
 					$file  = $name;
 					$pct   = 100;
@@ -484,7 +484,7 @@ class PB_Croc {
 		if ( false === $alive && ! in_array( $state, array( 'done' ), true ) ) {
 			$state = 'error';
 			if ( '' === $last ) {
-				$last = __( 'croc stopped unexpectedly. Your host may block outgoing connections to the relay (TCP ports 9009–9013).', 'probackup' );
+				$last = __( 'croc stopped unexpectedly. Your host may block outgoing connections to the relay (TCP ports 9009–9013).', 'monarch-migration' );
 			}
 		}
 		return array(
@@ -543,7 +543,7 @@ class PB_Croc {
 			}
 		}
 		if ( ! empty( $s['out'] ) ) {
-			PB_Storage::rrmdir( $s['out'] );
+			Monarch_Storage::rrmdir( $s['out'] );
 		}
 		@unlink( $s['log'] ); // phpcs:ignore
 		@unlink( self::session_file( $sid ) ); // phpcs:ignore

@@ -6,7 +6,7 @@
  * than the last one it has, so the activity log streams live without resending
  * the whole history on every step.
  *
- * @package ProBackup
+ * @package Monarch
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Job logger.
  */
-class PB_Log {
+class Monarch_Log {
 
 	const MAX = 2000;
 
